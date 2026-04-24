@@ -70,7 +70,6 @@ const LOOK_SENS_PHONE = 0.006;
 let lookDeltaYawMouse = 0;
 let lookDeltaPitchMouse = 0;
 let lookDeltaYawPhone = 0;
-let lookDeltaPitchPhone = 0;
 
 // iPhone look stream watchdog (phone stream fades out only for phone input)
 let phoneLookLastTs = 0;
@@ -597,8 +596,11 @@ function spawnZombie(x, z) {
   });
 }
 
-// Spawn the first wave
-SPAWN_POINTS.slice(0, 4).forEach(([x, z]) => spawnZombie(x, z));
+// Spawn the first wave only after the game is explicitly started.
+function spawnInitialWave() {
+  if (zombies.length > 0) return;
+  SPAWN_POINTS.slice(0, 4).forEach(([x, z]) => spawnZombie(x, z));
+}
 
 // Flash zombie white on hit, then restore colour
 function hitZombie(zombie) {
@@ -987,6 +989,9 @@ function startGame() {
   if (ammoHudEl) ammoHudEl.classList.add("active");
   if (crosshairEl) crosshairEl.classList.add("active");
 
+  // Begin enemy gameplay only now (empty room before start for control testing).
+  spawnInitialWave();
+
   updateHUD();
   requestLock();
 }
@@ -1124,12 +1129,7 @@ function connectToServer() {
       if (typeof msg.yawDelta === "number" && Number.isFinite(msg.yawDelta)) {
         lookDeltaYawPhone += msg.yawDelta * LOOK_SENS_PHONE;
       }
-      if (
-        typeof msg.pitchDelta === "number" &&
-        Number.isFinite(msg.pitchDelta)
-      ) {
-        lookDeltaPitchPhone += msg.pitchDelta * LOOK_SENS_PHONE;
-      }
+      // Phone up/down look intentionally ignored: camera moves sideways only.
       phoneLookLastTs = performance.now();
       phoneLookWeight = 1;
     }
@@ -1138,7 +1138,6 @@ function connectToServer() {
     // This prevents stale orientation drift from carrying over after recalibration.
     if (msg.type === "calibrate") {
       lookDeltaYawPhone = 0;
-      lookDeltaPitchPhone = 0;
       phoneLookLastTs = performance.now();
       phoneLookWeight = 0;
       showWarning("Controller recalibrated");
@@ -1197,21 +1196,13 @@ function animate() {
       Math.min(DEG85, pitchObject.rotation.x + lookDeltaPitchMouse),
     );
 
-    // Phone stream is additive and independently weighted/faded
+    // Phone stream is additive on yaw only (sideways camera movement).
     yawObject.rotation.y += lookDeltaYawPhone * phoneLookWeight;
-    pitchObject.rotation.x = Math.max(
-      -DEG85,
-      Math.min(
-        DEG85,
-        pitchObject.rotation.x + lookDeltaPitchPhone * phoneLookWeight,
-      ),
-    );
 
     // consume frame deltas
     lookDeltaYawMouse = 0;
     lookDeltaPitchMouse = 0;
     lookDeltaYawPhone = 0;
-    lookDeltaPitchPhone = 0;
 
     // Gameplay loop begins only after explicit start
     if (gameStarted) {
