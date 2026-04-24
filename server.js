@@ -137,7 +137,7 @@ wss.on("connection", (ws, req) => {
 
     // ── Controller → Game actions ──────────────────────────────────────────
     // Forward controller actions/messages verbatim to the game client.
-    // Supported now: "fire", "reload", "look", "calibrate"
+    // Supported now: "fire", "reload", "look", "calibrate", "start"
     if (msg.type === "look") {
       // High-frequency stream; forward silently to avoid terminal spam.
       broadcast(gameClient, msg);
@@ -147,7 +147,8 @@ wss.on("connection", (ws, req) => {
     if (
       msg.type === "fire" ||
       msg.type === "reload" ||
-      msg.type === "calibrate"
+      msg.type === "calibrate" ||
+      msg.type === "start"
     ) {
       console.log(`  🎮  ${msg.type} from controller`);
       broadcast(gameClient, msg);

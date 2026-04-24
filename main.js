@@ -11,6 +11,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 let gameOver = false;
 let isLocked = false;
+let gameStarted = false; // zombies/gameplay begin only after explicit start
 let audioCtx = null;
 let ambientStarted = false;
 let score = 0; // zombies killed
@@ -975,12 +976,17 @@ function triggerGameOver() {
 // §20  GAME START
 // ═══════════════════════════════════════════════════════════════════════════════
 function startGame() {
+  if (gameStarted || gameOver) return;
+
+  gameStarted = true;
   getAudioContext();
   startAmbientDrone();
+
   if (overlayEl) overlayEl.style.display = "none";
   if (hudEl) hudEl.classList.add("active");
   if (ammoHudEl) ammoHudEl.classList.add("active");
   if (crosshairEl) crosshairEl.classList.add("active");
+
   updateHUD();
   requestLock();
 }
@@ -1109,6 +1115,7 @@ function connectToServer() {
     }
 
     // ── Actions forwarded from the iPhone ────────────────────────────────
+    if (msg.type === "start") startGame();
     if (msg.type === "fire") fireGun();
     if (msg.type === "reload") startReload();
 
@@ -1176,7 +1183,7 @@ function animate() {
   const delta = Math.min(now - lastTime, 100); // cap delta to avoid spiral-of-death
   lastTime = now;
 
-  if (!gameOver && isLocked) {
+  if (!gameOver) {
     // Blend camera look from mouse + iPhone stream each frame
     const sincePhone = now - phoneLookLastTs;
     if (sincePhone > 250) {
@@ -1206,12 +1213,20 @@ function animate() {
     lookDeltaYawPhone = 0;
     lookDeltaPitchPhone = 0;
 
-    processMovement();
-    tickFootsteps(delta);
-    updateZombies(delta);
-    applyCameraShake();
-    flickerLightsUpdate();
-    updateGunAnimation(delta);
+    // Gameplay loop begins only after explicit start
+    if (gameStarted) {
+      if (isLocked) {
+        processMovement();
+        tickFootsteps(delta);
+      } else {
+        isMoving = false;
+      }
+
+      updateZombies(delta);
+      applyCameraShake();
+      flickerLightsUpdate();
+      updateGunAnimation(delta);
+    }
   }
 
   renderer.render(scene, camera);

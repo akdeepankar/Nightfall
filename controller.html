@@ -209,7 +209,7 @@
 
             #bottom {
                 display: grid;
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: 1fr 1fr 1fr;
                 gap: 8px;
             }
 
@@ -405,6 +405,7 @@
             </div>
 
             <div id="bottom">
+                <button id="start" class="btn-ghost">Start Game</button>
                 <button id="reload" class="btn-warn">Reload</button>
                 <button id="cal">Calibrate</button>
             </div>
@@ -443,11 +444,9 @@
                 ay = 0,
                 az = 0;
 
-            // Motion-based look (sideways + up/down movement)
-            let baseX = null,
-                baseY = null;
-            let smoothX = 0,
-                smoothY = 0;
+            // Drift-free motion look uses acceleration deltas (jerk), not absolute baseline.
+            let smoothDX = 0,
+                smoothDY = 0;
 
             let motionEventCount = 0;
             let orientationEventCount = 0;
@@ -456,8 +455,8 @@
             const SHAKECD = 260;
             const LOOKMS = 28;
             const LOOKS = 2.2;
-            const MOTION_DEADZONE = 0.4;
-            const MOTION_SMOOTH = 0.18;
+            const MOTION_DEADZONE = 0.12;
+            const MOTION_SMOOTH = 0.2;
 
             const send = (o) => {
                 if (ws && ws.readyState === 1) ws.send(JSON.stringify(o));
@@ -608,31 +607,29 @@
                     y = source.y || 0,
                     z = source.z || 0;
 
-                // First samples set neutral baseline
-                if (baseX === null || baseY === null) {
-                    baseX = x;
-                    baseY = y;
-                }
-
-                // Sideways movement controls yaw, up/down controls pitch
-                let relX = x - baseX;
-                let relY = y - baseY;
-
-                // Deadzone to avoid micro jitter
-                if (Math.abs(relX) < MOTION_DEADZONE) relX = 0;
-                if (Math.abs(relY) < MOTION_DEADZONE) relY = 0;
-
-                // Exponential smoothing
-                smoothX += (relX - smoothX) * MOTION_SMOOTH;
-                smoothY += (relY - smoothY) * MOTION_SMOOTH;
-
-                // Send motion look deltas
-                sendLook(-smoothX, smoothY);
-
-                // Keep shake-to-fire using derivative magnitude
+                // Drift-free look control:
+                // use acceleration deltas (jerk) so view doesn't keep drifting upward.
                 const dx = x - ax,
                     dy = y - ay,
                     dz = z - az;
+
+                // Sideways phone movement -> yaw, up/down movement -> pitch
+                // Corrected direction: invert both axes to match natural camera response.
+                let lookX = dx;
+                let lookY = dy;
+
+                // Deadzone to avoid micro jitter
+                if (Math.abs(lookX) < MOTION_DEADZONE) lookX = 0;
+                if (Math.abs(lookY) < MOTION_DEADZONE) lookY = 0;
+
+                // Exponential smoothing on deltas
+                smoothDX += (lookX - smoothDX) * MOTION_SMOOTH;
+                smoothDY += (lookY - smoothDY) * MOTION_SMOOTH;
+
+                // Send motion look deltas
+                sendLook(-smoothDX, -smoothDY);
+
+                // Keep shake-to-fire using derivative magnitude
                 ax = x;
                 ay = y;
                 az = z;
@@ -848,13 +845,14 @@
             }
 
             function calibrate() {
-                baseX = null;
-                baseY = null;
-                smoothX = 0;
-                smoothY = 0;
+                smoothDX = 0;
+                smoothDY = 0;
+                ax = 0;
+                ay = 0;
+                az = 0;
                 // Keep existing stream flags so UI remains accurate.
                 send({ type: "calibrate" }); // optional; desktop may ignore
-                showToast("Motion baseline reset");
+                showToast("Motion control reset");
             }
 
             el("reconnect").onclick = () => {
@@ -871,6 +869,10 @@
                 sensorSub.textContent =
                     "Requesting motion/orientation permission...";
                 await enableMotion();
+            };
+            el("start").onclick = () => {
+                send({ type: "start" });
+                showToast("Start Game sent");
             };
             el("reload").onclick = () => {
                 send({ type: "reload" });
