@@ -11,7 +11,8 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 let gameOver = false;
 let isLocked = false;
-let gameStarted = false; // zombies/gameplay begin only after explicit start
+let gameStarted = false; // true after "Start Game" command (enemies active)
+let roomEntered = false; // true after first Enter/click to load empty room
 let audioCtx = null;
 let ambientStarted = false;
 let score = 0; // zombies killed
@@ -978,22 +979,30 @@ function triggerGameOver() {
 // §20  GAME START
 // ═══════════════════════════════════════════════════════════════════════════════
 function startGame() {
-  if (gameStarted || gameOver) return;
+  if (gameOver) return;
 
+  // First call enters empty room only.
+  if (!roomEntered) {
+    roomEntered = true;
+    getAudioContext();
+    startAmbientDrone();
+
+    if (overlayEl) overlayEl.style.display = "none";
+    if (hudEl) hudEl.classList.add("active");
+    if (ammoHudEl) ammoHudEl.classList.add("active");
+    if (crosshairEl) crosshairEl.classList.add("active");
+
+    updateHUD();
+    requestLock();
+    showWarning("Empty room loaded. Press Start Game on controller to begin.");
+    return;
+  }
+
+  // Second call (controller Start command) begins enemies.
+  if (gameStarted) return;
   gameStarted = true;
-  getAudioContext();
-  startAmbientDrone();
-
-  if (overlayEl) overlayEl.style.display = "none";
-  if (hudEl) hudEl.classList.add("active");
-  if (ammoHudEl) ammoHudEl.classList.add("active");
-  if (crosshairEl) crosshairEl.classList.add("active");
-
-  // Begin enemy gameplay only now (empty room before start for control testing).
   spawnInitialWave();
-
-  updateHUD();
-  requestLock();
+  showWarning("Game started. Enemies are coming...");
 }
 
 if (enterBtnEl) enterBtnEl.addEventListener("click", startGame);
@@ -1120,7 +1129,11 @@ function connectToServer() {
     }
 
     // ── Actions forwarded from the iPhone ────────────────────────────────
-    if (msg.type === "start") startGame();
+    if (msg.type === "start") {
+      // If room isn't entered yet, first start opens empty room.
+      // If already entered, second start begins enemy gameplay.
+      startGame();
+    }
     if (msg.type === "fire") fireGun();
     if (msg.type === "reload") startReload();
 
@@ -1204,7 +1217,19 @@ function animate() {
     lookDeltaPitchMouse = 0;
     lookDeltaYawPhone = 0;
 
-    // Gameplay loop begins only after explicit start
+    // Empty room phase (entered but not started): movement + gun animation only.
+    if (roomEntered && !gameStarted) {
+      if (isLocked) {
+        processMovement();
+        tickFootsteps(delta);
+      } else {
+        isMoving = false;
+      }
+      flickerLightsUpdate();
+      updateGunAnimation(delta);
+    }
+
+    // Full gameplay phase after Start Game command.
     if (gameStarted) {
       if (isLocked) {
         processMovement();

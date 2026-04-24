@@ -33,7 +33,8 @@
             body {
                 width: 100%;
                 height: 100%;
-                overflow: hidden;
+                overflow-x: hidden;
+                overflow-y: auto;
                 background: radial-gradient(
                     900px 500px at 50% -10%,
                     #1c2740 0%,
@@ -49,18 +50,19 @@
             }
 
             #app {
-                height: 100vh;
-                padding: 8px;
+                min-height: 100vh;
+                padding: 10px;
                 display: grid;
-                gap: 6px;
-                grid-template-rows: auto auto auto 1fr auto;
+                gap: 8px;
+                grid-template-rows: auto auto auto minmax(220px, 1fr) auto;
             }
 
             .card {
-                background: var(--panel);
+                background: linear-gradient(180deg, #1d2740 0%, #182238 100%);
                 border: 1px solid var(--line);
-                border-radius: 10px;
+                border-radius: 12px;
                 padding: 8px;
+                box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
             }
 
             .row {
@@ -174,9 +176,9 @@
             }
 
             #main {
-                min-height: 0;
+                min-height: 220px;
                 display: grid;
-                gap: 6px;
+                gap: 8px;
                 grid-template-rows: auto auto 1fr;
             }
 
@@ -199,10 +201,10 @@
                         #180204 100%
                     );
                 box-shadow:
-                    inset 0 0 50px rgba(0, 0, 0, 0.45),
-                    0 8px 18px rgba(0, 0, 0, 0.35);
-                font-size: clamp(28px, 10vw, 44px);
-                letter-spacing: 0.14em;
+                    inset 0 0 55px rgba(0, 0, 0, 0.45),
+                    0 10px 22px rgba(0, 0, 0, 0.38);
+                font-size: clamp(26px, 9vw, 42px);
+                letter-spacing: 0.12em;
                 font-weight: 900;
                 text-transform: uppercase;
             }
@@ -327,20 +329,20 @@
                         >
                     </div>
                 </div>
-                <div id="host" class="sub">Server: waiting...</div>
+                <div id="host" class="sub">Server: …</div>
             </div>
 
             <div class="card" id="triple">
                 <div>
                     <div class="title">Link</div>
-                    <div id="linkSub" class="sub">Not linked</div>
+                    <div id="linkSub" class="sub">Offline</div>
                 </div>
                 <div>
                     <span id="ctrlDot" class="dot bad"></span>
                     <span
                         id="ctrlTxt"
                         style="font-size: 11px; color: var(--muted)"
-                        >No Link</span
+                        >Off</span
                     >
                 </div>
                 <button id="reconnect" class="btn-ghost">Reconnect</button>
@@ -349,7 +351,7 @@
             <div class="card" id="triple">
                 <div>
                     <div class="title">Motion</div>
-                    <div id="sensorSub" class="sub">Tap Enable Motion</div>
+                    <div id="sensorSub" class="sub">Tap Enable</div>
                 </div>
                 <div>
                     <span id="sensorDot" class="dot warn"></span>
@@ -504,7 +506,7 @@
                 wsTxt.textContent = "Connecting";
                 setDot(ctrlDot, "bad");
                 ctrlTxt.textContent = "No Link";
-                linkSub.textContent = "Not linked";
+                linkSub.textContent = "Offline";
                 host.textContent = "Server: " + location.origin;
 
                 try {
@@ -520,8 +522,8 @@
                     setDot(wsDot, "ok");
                     wsTxt.textContent = "Connected";
                     setDot(ctrlDot, "ok");
-                    ctrlTxt.textContent = "Linked";
-                    linkSub.textContent = "Commands reaching game";
+                    ctrlTxt.textContent = "On";
+                    linkSub.textContent = "Live";
                     send({ type: "register", role: "controller" });
                     showToast("Controller connected");
                 };
@@ -573,7 +575,7 @@
                 if (navigator.vibrate) navigator.vibrate(20);
 
                 if (fromShake) {
-                    fire.textContent = "Shake";
+                    fire.textContent = "Fired";
                     setTimeout(() => (fire.textContent = "Fire"), 320);
                 }
             }
@@ -690,24 +692,21 @@
                     setDot(sensorDot, "ok");
                     sensorTxt.textContent = "Enabled";
                     sensorSub.textContent =
-                        "Motion " +
+                        "M:" +
                         (motionEventSeen ? "ON" : "OFF") +
-                        " • Orientation " +
-                        (orientationEventSeen ? "ON" : "OFF") +
-                        " • Control mode: phone movement";
+                        " • O:" +
+                        (orientationEventSeen ? "ON" : "OFF");
                     el("enable").textContent = "Re-enable";
                     showToast("Sensors enabled");
                 } else if (granted) {
                     setDot(sensorDot, "warn");
                     sensorTxt.textContent = "Waiting";
-                    sensorSub.textContent =
-                        "Permission granted, but no sensor stream yet. Move phone and try again.";
+                    sensorSub.textContent = "No stream yet";
                     showToast("No sensor stream detected", 2200);
                 } else {
                     setDot(sensorDot, "bad");
                     sensorTxt.textContent = "Blocked";
-                    sensorSub.textContent =
-                        "Permission denied or sensor stream unavailable. Check Safari Motion & Orientation Access.";
+                    sensorSub.textContent = "Denied/Blocked";
                     showToast("Sensors blocked", 2200);
                 }
             }
@@ -733,8 +732,7 @@
                 if (!isSecureContextLike) {
                     setDot(sensorDot, "bad");
                     sensorTxt.textContent = "Insecure Context";
-                    sensorSub.textContent =
-                        "This page is not in a secure context. Use HTTPS (or localhost) in Safari to access motion/orientation APIs.";
+                    sensorSub.textContent = "Need HTTPS";
                 }
 
                 // iOS explicit permission requests (must be inside user gesture).
@@ -759,9 +757,7 @@
                         promptApiMissing = true;
                     }
                 } catch (err) {
-                    sensorSub.textContent =
-                        "Motion permission error: " +
-                        (err && err.message ? err.message : "request failed");
+                    sensorSub.textContent = "Motion error";
                 }
 
                 try {
@@ -781,10 +777,7 @@
                         promptApiMissing = true;
                     }
                 } catch (err) {
-                    sensorSub.textContent =
-                        "Orientation permission error: " +
-                        (err && err.message ? err.message : "request failed") +
-                        ". iOS may keep prior permission state without showing a new prompt.";
+                    sensorSub.textContent = "Orientation error";
                 }
 
                 let m = false,
@@ -820,21 +813,18 @@
                 if (promptApiMissing && !askedMotion && !askedOrientation) {
                     setDot(sensorDot, "warn");
                     sensorTxt.textContent = "No Prompt API";
-                    sensorSub.textContent =
-                        "No prompt API in this context. iOS may not show a popup here. Use Safari on iPhone, ensure Motion & Orientation Access is ON, and move the phone to test live events.";
+                    sensorSub.textContent = "No prompt API";
                 }
 
                 if (m || o || granted) {
                     setDot(sensorDot, "warn");
                     sensorTxt.textContent = "Checking";
-                    sensorSub.textContent =
-                        "Listening for devicemotion/deviceorientation events. If no popup appeared, permission may already be stored by iOS for this site.";
+                    sensorSub.textContent = "Listening...";
                     el("enable").textContent = "Re-enable";
                 } else {
                     setDot(sensorDot, "bad");
                     sensorTxt.textContent = "Blocked";
-                    sensorSub.textContent =
-                        "Permission denied or unavailable. If no prompt appears, iOS likely has a saved decision for this site. Check Safari Motion & Orientation Access and reset site permissions if needed.";
+                    sensorSub.textContent = "Denied/Unavailable";
                     showToast("Sensors blocked", 2200);
                     return;
                 }
@@ -866,8 +856,7 @@
             el("enable").onclick = async () => {
                 setDot(sensorDot, "warn");
                 sensorTxt.textContent = "Requesting";
-                sensorSub.textContent =
-                    "Requesting motion/orientation permission...";
+                sensorSub.textContent = "Requesting...";
                 await enableMotion();
             };
             el("start").onclick = () => {
@@ -890,8 +879,7 @@
                     if (!motionEventSeen && !orientationEventSeen) {
                         setDot(sensorDot, "warn");
                         sensorTxt.textContent = "Requesting";
-                        sensorSub.textContent =
-                            "Requesting motion/orientation permission...";
+                        sensorSub.textContent = "Requesting...";
                         enableMotion();
                     }
 
