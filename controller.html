@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
+        />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta
+            name="apple-mobile-web-app-status-bar-style"
+            content="black-translucent"
+        />
+        <title>NIGHTFALL Controller</title>
+        <style>
+            :root {
+                --bg: #0f1420;
+                --panel: #1a2335;
+                --line: #334463;
+                --text: #e8eeff;
+                --muted: #9aabcf;
+                --ok: #22c55e;
+                --warn: #f59e0b;
+                --bad: #ef4444;
+            }
+
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background: radial-gradient(
+                    900px 500px at 50% -10%,
+                    #1c2740 0%,
+                    var(--bg) 45%
+                );
+                color: var(--text);
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    Arial, sans-serif;
+                -webkit-tap-highlight-color: transparent;
+                user-select: none;
+                touch-action: manipulation;
+            }
+
+            #app {
+                height: 100vh;
+                padding: 10px;
+                display: grid;
+                gap: 8px;
+                grid-template-rows: auto auto auto 1fr auto;
+            }
+
+            .card {
+                background: var(--panel);
+                border: 1px solid var(--line);
+                border-radius: 10px;
+                padding: 10px;
+            }
+
+            .row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+            }
+
+            .title {
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+            }
+
+            .sub {
+                margin-top: 4px;
+                font-size: 12px;
+                color: var(--muted);
+                line-height: 1.3;
+            }
+
+            .dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                display: inline-block;
+                background: #7b879c;
+                margin-right: 6px;
+                vertical-align: middle;
+            }
+            .ok {
+                background: var(--ok);
+                box-shadow: 0 0 8px rgba(34, 197, 94, 0.7);
+            }
+            .warn {
+                background: var(--warn);
+                box-shadow: 0 0 8px rgba(245, 158, 11, 0.7);
+            }
+            .bad {
+                background: var(--bad);
+                box-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
+            }
+
+            button {
+                border: 1px solid #4d638e;
+                background: #2a3b5f;
+                color: #fff;
+                border-radius: 8px;
+                padding: 10px 12px;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.07em;
+                text-transform: uppercase;
+            }
+            button:active {
+                transform: scale(0.97);
+            }
+
+            .btn-warn {
+                background: linear-gradient(180deg, #f5b348, #d88a16);
+                border-color: #ffc36d;
+                color: #1a1300;
+            }
+
+            .btn-ghost {
+                background: #1f2c46;
+                border-color: #36496f;
+                color: #d4def7;
+            }
+
+            #triple {
+                display: grid;
+                grid-template-columns: 1fr auto auto;
+                gap: 8px;
+                align-items: center;
+            }
+
+            #ammo {
+                display: flex;
+                gap: 6px;
+                flex-wrap: wrap;
+                min-height: 12px;
+            }
+            .ammo-dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background: #fde047;
+                box-shadow: 0 0 8px rgba(253, 224, 71, 0.6);
+            }
+            .ammo-dot.spent {
+                background: #3a4a68;
+                box-shadow: none;
+            }
+
+            #bar {
+                height: 8px;
+                background: #0f172a;
+                border: 1px solid #334463;
+                border-radius: 999px;
+                overflow: hidden;
+                margin-top: 6px;
+            }
+            #fill {
+                height: 100%;
+                width: 0%;
+                background: linear-gradient(90deg, #ef4444, #f59e0b, #fde047);
+                transition: width 0.08s linear;
+            }
+
+            #main {
+                min-height: 0;
+                display: grid;
+                gap: 8px;
+                grid-template-rows: auto auto 1fr;
+            }
+
+            #fire {
+                width: 100%;
+                height: 100%;
+                min-height: 220px;
+                border-radius: 16px;
+                border: 1px solid #9f2a34;
+                background:
+                    radial-gradient(
+                        120% 120% at 50% 20%,
+                        rgba(255, 170, 170, 0.2),
+                        rgba(255, 170, 170, 0) 40%
+                    ),
+                    radial-gradient(
+                        160% 120% at 50% 100%,
+                        #9d121b 0%,
+                        #5d080e 45%,
+                        #180204 100%
+                    );
+                box-shadow:
+                    inset 0 0 60px rgba(0, 0, 0, 0.45),
+                    0 10px 24px rgba(0, 0, 0, 0.4);
+                font-size: clamp(34px, 12vw, 52px);
+                letter-spacing: 0.16em;
+                font-weight: 900;
+                text-transform: uppercase;
+            }
+
+            #bottom {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            #flash {
+                position: fixed;
+                inset: 0;
+                pointer-events: none;
+                opacity: 0;
+                background: rgba(255, 120, 80, 0.26);
+            }
+            #flash.show {
+                animation: flashOut 0.14s ease-out;
+            }
+            @keyframes flashOut {
+                0% {
+                    opacity: 1;
+                }
+                100% {
+                    opacity: 0;
+                }
+            }
+
+            #toast {
+                position: fixed;
+                left: 50%;
+                bottom: 12px;
+                transform: translateX(-50%);
+                background: rgba(20, 26, 38, 0.95);
+                border: 1px solid var(--line);
+                color: #dbe4ff;
+                border-radius: 8px;
+                padding: 8px 10px;
+                font-size: 12px;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.16s ease;
+            }
+            #toast.show {
+                opacity: 1;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="app">
+            <div class="card">
+                <div class="row">
+                    <div class="title">Nightfall Controller</div>
+                    <div>
+                        <span id="wsDot" class="dot warn"></span>
+                        <span
+                            id="wsTxt"
+                            style="font-size: 12px; color: var(--muted)"
+                            >Connecting</span
+                        >
+                    </div>
+                </div>
+                <div id="host" class="sub">Server: waiting...</div>
+            </div>
+
+            <div class="card" id="triple">
+                <div>
+                    <div class="title">Link</div>
+                    <div id="linkSub" class="sub">Not linked</div>
+                </div>
+                <div>
+                    <span id="ctrlDot" class="dot bad"></span>
+                    <span
+                        id="ctrlTxt"
+                        style="font-size: 12px; color: var(--muted)"
+                        >No Link</span
+                    >
+                </div>
+                <button id="reconnect" class="btn-ghost">Reconnect</button>
+            </div>
+
+            <div class="card" id="triple">
+                <div>
+                    <div class="title">Motion</div>
+                    <div id="sensorSub" class="sub">Tap Enable Motion</div>
+                </div>
+                <div>
+                    <span id="sensorDot" class="dot warn"></span>
+                    <span
+                        id="sensorTxt"
+                        style="font-size: 12px; color: var(--muted)"
+                        >Off</span
+                    >
+                </div>
+                <button id="enable">Enable Motion</button>
+            </div>
+
+            <div id="main">
+                <div class="card row">
+                    <div id="ammo"></div>
+                    <div
+                        style="
+                            font-size: 12px;
+                            color: var(--muted);
+                            letter-spacing: 0.08em;
+                            text-transform: uppercase;
+                        "
+                    >
+                        Tilt = Look
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="row">
+                        <span style="font-size: 12px; color: var(--muted)"
+                            >Shake</span
+                        >
+                        <span
+                            id="pct"
+                            style="font-size: 12px; color: var(--muted)"
+                            >0%</span
+                        >
+                    </div>
+                    <div
+                        id="sensorCounts"
+                        style="
+                            margin-top: 4px;
+                            font-size: 11px;
+                            color: var(--muted);
+                        "
+                    >
+                        M: 0 • O: 0
+                    </div>
+                    <div id="bar"><div id="fill"></div></div>
+                </div>
+
+                <button id="fire" aria-label="Fire">Fire</button>
+            </div>
+
+            <div id="bottom">
+                <button id="reload" class="btn-warn">Reload</button>
+                <button id="cal">Calibrate</button>
+            </div>
+        </div>
+
+        <div id="flash"></div>
+        <div id="toast"></div>
+
+        <script>
+            const el = (id) => document.getElementById(id);
+
+            const wsDot = el("wsDot");
+            const wsTxt = el("wsTxt");
+            const ctrlDot = el("ctrlDot");
+            const ctrlTxt = el("ctrlTxt");
+            const linkSub = el("linkSub");
+            const sensorDot = el("sensorDot");
+            const sensorTxt = el("sensorTxt");
+            const sensorSub = el("sensorSub");
+            const host = el("host");
+            const fill = el("fill");
+            const pct = el("pct");
+            const sensorCounts = el("sensorCounts");
+            const fire = el("fire");
+            const toast = el("toast");
+
+            let ws = null;
+            let ready = false;
+            let retry = null;
+            let retries = 0;
+
+            let cool = false;
+            let lastA = null,
+                lastB = null,
+                lastSend = 0;
+            let lastShake = 0,
+                ax = 0,
+                ay = 0,
+                az = 0;
+
+            let motionEventCount = 0;
+            let orientationEventCount = 0;
+
+            const SHAKE = 8.5;
+            const SHAKECD = 260;
+            const LOOKMS = 28;
+            const LOOKS = 2.2;
+
+            const send = (o) => {
+                if (ws && ws.readyState === 1) ws.send(JSON.stringify(o));
+            };
+
+            const setDot = (d, c) => (d.className = "dot " + c);
+
+            function showToast(msg, ms = 1600) {
+                toast.textContent = msg;
+                toast.classList.add("show");
+                clearTimeout(showToast._t);
+                showToast._t = setTimeout(
+                    () => toast.classList.remove("show"),
+                    ms,
+                );
+            }
+
+            function renderAmmo(cur = 10, max = 10) {
+                const a = el("ammo");
+                a.innerHTML = "";
+                for (let i = 0; i < max; i++) {
+                    const s = document.createElement("span");
+                    s.className = "ammo-dot" + (i < cur ? "" : " spent");
+                    a.appendChild(s);
+                }
+            }
+
+            function norm(d) {
+                let x = d;
+                while (x > 180) x -= 360;
+                while (x < -180) x += 360;
+                return x;
+            }
+
+            function wsURL() {
+                return (
+                    (location.protocol === "https:" ? "wss://" : "ws://") +
+                    location.host
+                );
+            }
+
+            function scheduleReconnect() {
+                retries += 1;
+                const delay = Math.min(1200 + retries * 800, 6000);
+                clearTimeout(retry);
+                retry = setTimeout(connect, delay);
+            }
+
+            function connect() {
+                clearTimeout(retry);
+                setDot(wsDot, "warn");
+                wsTxt.textContent = "Connecting";
+                setDot(ctrlDot, "bad");
+                ctrlTxt.textContent = "No Link";
+                linkSub.textContent = "Not linked";
+                host.textContent = "Server: " + location.origin;
+
+                try {
+                    ws = new WebSocket(wsURL());
+                } catch {
+                    scheduleReconnect();
+                    return;
+                }
+
+                ws.onopen = () => {
+                    ready = true;
+                    retries = 0;
+                    setDot(wsDot, "ok");
+                    wsTxt.textContent = "Connected";
+                    setDot(ctrlDot, "ok");
+                    ctrlTxt.textContent = "Linked";
+                    linkSub.textContent = "Commands reaching game";
+                    send({ type: "register", role: "controller" });
+                    showToast("Controller connected");
+                };
+
+                ws.onmessage = (e) => {
+                    let m;
+                    try {
+                        m = JSON.parse(e.data);
+                    } catch {
+                        return;
+                    }
+                    if (m.type === "ammoSync") renderAmmo(m.ammo, m.maxAmmo);
+                    if (m.type === "serverInfo")
+                        host.textContent =
+                            "Game server: http://" + m.ip + ":" + m.port;
+                };
+
+                ws.onerror = () => {
+                    setDot(wsDot, "bad");
+                    wsTxt.textContent = "Error";
+                };
+
+                ws.onclose = () => {
+                    ready = false;
+                    setDot(wsDot, "warn");
+                    wsTxt.textContent = "Reconnecting";
+                    scheduleReconnect();
+                };
+            }
+
+            function pulseFlash() {
+                const fx = el("flash");
+                fx.classList.remove("show");
+                void fx.offsetWidth;
+                fx.classList.add("show");
+            }
+
+            function fireNow(fromShake) {
+                if (cool) return;
+                cool = true;
+                setTimeout(() => (cool = false), 300);
+
+                send({ type: "fire" });
+                pulseFlash();
+
+                fire.style.transform = "scale(0.97)";
+                setTimeout(() => (fire.style.transform = ""), 120);
+
+                if (navigator.vibrate) navigator.vibrate(20);
+
+                if (fromShake) {
+                    fire.textContent = "Shake";
+                    setTimeout(() => (fire.textContent = "Fire"), 320);
+                }
+            }
+
+            let motionEventSeen = false;
+            let orientationEventSeen = false;
+            let enableCheckTimer = null;
+
+            function onMotion(e) {
+                motionEventSeen = true;
+                motionEventCount++;
+                if (sensorCounts)
+                    sensorCounts.textContent =
+                        "M: " +
+                        motionEventCount +
+                        " • O: " +
+                        orientationEventCount;
+
+                // MDN-aligned: prefer accelerationIncludingGravity for broad support.
+                // Fallback to acceleration when available.
+                const accG =
+                    e.accelerationIncludingGravity &&
+                    typeof e.accelerationIncludingGravity.x === "number"
+                        ? e.accelerationIncludingGravity
+                        : null;
+                const acc =
+                    e.acceleration && typeof e.acceleration.x === "number"
+                        ? e.acceleration
+                        : null;
+
+                const source = accG || acc;
+                if (!source) return;
+
+                const x = source.x || 0,
+                    y = source.y || 0,
+                    z = source.z || 0;
+
+                const dx = x - ax,
+                    dy = y - ay,
+                    dz = z - az;
+                ax = x;
+                ay = y;
+                az = z;
+
+                const mag = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                const p = Math.max(0, Math.min(100, (mag / SHAKE) * 100));
+                fill.style.width = p.toFixed(0) + "%";
+                pct.textContent = p.toFixed(0) + "%";
+
+                const now = Date.now();
+                if (mag > SHAKE && now - lastShake > SHAKECD) {
+                    lastShake = now;
+                    fireNow(true);
+                }
+            }
+
+            function sendLook(yawDelta, pitchDelta) {
+                if (!ready) return;
+                const now = performance.now();
+                if (now - lastSend < LOOKMS) return;
+                lastSend = now;
+                if (Math.abs(yawDelta) < 0.02 && Math.abs(pitchDelta) < 0.02)
+                    return;
+                send({
+                    type: "look",
+                    yawDelta: yawDelta * LOOKS,
+                    pitchDelta: pitchDelta * LOOKS,
+                });
+            }
+
+            function onOrientation(e) {
+                // MDN-aligned orientation handling:
+                // - Prefer beta/gamma for practical tilt controls
+                // - Keep alpha fallback path if needed
+                // - Track absolute-availability for diagnostics
+                const hasAlpha = typeof e.alpha === "number";
+                const hasBeta = typeof e.beta === "number";
+                const hasGamma = typeof e.gamma === "number";
+
+                if (!hasAlpha && !hasBeta && !hasGamma) return;
+
+                orientationEventSeen = true;
+                orientationEventCount++;
+                if (sensorCounts)
+                    sensorCounts.textContent =
+                        "M: " +
+                        motionEventCount +
+                        " • O: " +
+                        orientationEventCount;
+
+                // Prefer gamma for yaw-like horizontal tilt, beta for pitch-like vertical tilt.
+                // Fallback to alpha if gamma is unavailable.
+                const yawSource = hasGamma ? e.gamma : hasAlpha ? e.alpha : 0;
+                const pitchSource = hasBeta ? e.beta : 0;
+
+                if (lastA === null || lastB === null) {
+                    lastA = yawSource;
+                    lastB = pitchSource;
+                    return;
+                }
+
+                const dYaw = norm(yawSource - lastA);
+                const dPitch = norm(pitchSource - lastB);
+                lastA = yawSource;
+                lastB = pitchSource;
+
+                // Send relative deltas regardless of absolute support.
+                // This keeps controls usable on more devices.
+                sendLook(-dYaw, dPitch);
+            }
+
+            function finalizeSensorState(granted) {
+                clearTimeout(enableCheckTimer);
+
+                // Require real events before claiming enabled.
+                const hasRealSignal = motionEventSeen || orientationEventSeen;
+
+                if (hasRealSignal) {
+                    setDot(sensorDot, "ok");
+                    sensorTxt.textContent = "Enabled";
+                    sensorSub.textContent =
+                        "Motion " +
+                        (motionEventSeen ? "ON" : "OFF") +
+                        " • Orientation " +
+                        (orientationEventSeen ? "ON" : "OFF");
+                    el("enable").textContent = "Re-enable";
+                    showToast("Sensors enabled");
+                } else if (granted) {
+                    setDot(sensorDot, "warn");
+                    sensorTxt.textContent = "Waiting";
+                    sensorSub.textContent =
+                        "Permission granted, but no sensor stream yet. Move phone and try again.";
+                    showToast("No sensor stream detected", 2200);
+                } else {
+                    setDot(sensorDot, "bad");
+                    sensorTxt.textContent = "Blocked";
+                    sensorSub.textContent =
+                        "Permission denied or sensor stream unavailable. Check Safari Motion & Orientation Access.";
+                    showToast("Sensors blocked", 2200);
+                }
+            }
+
+            async function enableMotion() {
+                let granted = false;
+                let askedMotion = false;
+                let askedOrientation = false;
+                let promptApiMissing = false;
+
+                motionEventSeen = false;
+                orientationEventSeen = false;
+                motionEventCount = 0;
+                orientationEventCount = 0;
+                if (sensorCounts) sensorCounts.textContent = "M: 0 • O: 0";
+
+                // Secure-context diagnostics (MDN guidance): many sensor APIs are restricted.
+                const isSecureContextLike =
+                    window.isSecureContext ||
+                    location.hostname === "localhost" ||
+                    location.hostname === "127.0.0.1";
+
+                if (!isSecureContextLike) {
+                    setDot(sensorDot, "bad");
+                    sensorTxt.textContent = "Insecure Context";
+                    sensorSub.textContent =
+                        "This page is not in a secure context. Use HTTPS (or localhost) in Safari to access motion/orientation APIs.";
+                }
+
+                // iOS explicit permission requests (must be inside user gesture).
+                // NOTE: iOS may NOT always show a popup:
+                // - if permission was already granted previously
+                // - if it was denied and persisted by browser settings
+                // - if this browser context does not expose the prompt API
+                try {
+                    if (typeof DeviceMotionEvent !== "undefined") {
+                        if (
+                            typeof DeviceMotionEvent.requestPermission ===
+                            "function"
+                        ) {
+                            askedMotion = true;
+                            const r =
+                                await DeviceMotionEvent.requestPermission();
+                            if (r === "granted") granted = true;
+                        } else {
+                            promptApiMissing = true;
+                        }
+                    } else {
+                        promptApiMissing = true;
+                    }
+                } catch (err) {
+                    sensorSub.textContent =
+                        "Motion permission error: " +
+                        (err && err.message ? err.message : "request failed");
+                }
+
+                try {
+                    if (typeof DeviceOrientationEvent !== "undefined") {
+                        if (
+                            typeof DeviceOrientationEvent.requestPermission ===
+                            "function"
+                        ) {
+                            askedOrientation = true;
+                            const r =
+                                await DeviceOrientationEvent.requestPermission();
+                            if (r === "granted") granted = true;
+                        } else {
+                            promptApiMissing = true;
+                        }
+                    } else {
+                        promptApiMissing = true;
+                    }
+                } catch (err) {
+                    sensorSub.textContent =
+                        "Orientation permission error: " +
+                        (err && err.message ? err.message : "request failed") +
+                        ". iOS may keep prior permission state without showing a new prompt.";
+                }
+
+                let m = false,
+                    o = false;
+
+                try {
+                    window.removeEventListener("devicemotion", onMotion);
+                } catch {}
+                try {
+                    window.removeEventListener(
+                        "deviceorientation",
+                        onOrientation,
+                    );
+                } catch {}
+
+                try {
+                    window.addEventListener("devicemotion", onMotion, {
+                        passive: true,
+                    });
+                    m = true;
+                } catch {}
+                try {
+                    // MDN: deviceorientation can expose `absolute` and alpha/beta/gamma.
+                    // We keep one listener and handle fallbacks inside onOrientation.
+                    window.addEventListener(
+                        "deviceorientation",
+                        onOrientation,
+                        { passive: true },
+                    );
+                    o = true;
+                } catch {}
+
+                if (promptApiMissing && !askedMotion && !askedOrientation) {
+                    setDot(sensorDot, "warn");
+                    sensorTxt.textContent = "No Prompt API";
+                    sensorSub.textContent =
+                        "No prompt API in this context. iOS may not show a popup here. Use Safari on iPhone, ensure Motion & Orientation Access is ON, and move the phone to test live events.";
+                }
+
+                if (m || o || granted) {
+                    setDot(sensorDot, "warn");
+                    sensorTxt.textContent = "Checking";
+                    sensorSub.textContent =
+                        "Listening for devicemotion/deviceorientation events. If no popup appeared, permission may already be stored by iOS for this site.";
+                    el("enable").textContent = "Re-enable";
+                } else {
+                    setDot(sensorDot, "bad");
+                    sensorTxt.textContent = "Blocked";
+                    sensorSub.textContent =
+                        "Permission denied or unavailable. If no prompt appears, iOS likely has a saved decision for this site. Check Safari Motion & Orientation Access and reset site permissions if needed.";
+                    showToast("Sensors blocked", 2200);
+                    return;
+                }
+
+                enableCheckTimer = setTimeout(() => {
+                    finalizeSensorState(granted);
+                }, 2500);
+            }
+
+            function calibrate() {
+                lastA = null;
+                lastB = null;
+                // Keep existing stream flags so UI remains accurate.
+                send({ type: "calibrate" }); // optional; desktop may ignore
+                showToast("Calibration reset");
+            }
+
+            el("reconnect").onclick = () => {
+                try {
+                    if (ws) ws.close();
+                } catch {}
+                connect();
+                showToast("Reconnect requested");
+            };
+
+            el("enable").onclick = async () => {
+                setDot(sensorDot, "warn");
+                sensorTxt.textContent = "Requesting";
+                sensorSub.textContent =
+                    "Requesting motion/orientation permission...";
+                await enableMotion();
+            };
+            el("reload").onclick = () => {
+                send({ type: "reload" });
+                showToast("Reload sent");
+            };
+            el("cal").onclick = calibrate;
+
+            fire.addEventListener(
+                "touchstart",
+                (e) => {
+                    e.preventDefault();
+
+                    // Auto-attempt sensor enable on first FIRE touch so users don't
+                    // need a separate step before motion starts working.
+                    if (!motionEventSeen && !orientationEventSeen) {
+                        setDot(sensorDot, "warn");
+                        sensorTxt.textContent = "Requesting";
+                        sensorSub.textContent =
+                            "Requesting motion/orientation permission...";
+                        enableMotion();
+                    }
+
+                    fireNow(false);
+                },
+                { passive: false },
+            );
+            fire.addEventListener("mousedown", (e) => {
+                e.preventDefault();
+                fireNow(false);
+            });
+
+            renderAmmo(10, 10);
+            connect();
+            setInterval(() => send({ type: "ping", t: Date.now() }), 12000);
+        </script>
+    </body>
+</html>

@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta</head> name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>NIGHTFALL Controller v2</title>
+  <style>
+    :root{</style>
+      --bg:#0d111a;
+      --panel:#161d2b;
+      --line:#2a3348;
+      --text:#eaf0ff;
+      --muted:#9eabc7;
+      --ok:#2dd881;
+      --warn:#ffbe55;
+      --bad:#ff4e5e;
+      --blue:#4b79ff;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:100%;height:100%;overflow:hidden;background:radial-gradient(900px 500px at 50% -10%, #1b2539 0%, var(--bg) 45%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;-webkit-tap-highlight-color:transparent;user-select:none}
+    #app{height:100%;display:grid;grid-template-rows:auto auto auto 1fr auto;gap:10px;padding:10px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
+    .row{display:flex;align-items:center;gap:8px}
+    .space{justify-content:space-between}
+    .title{font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+    .sub{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.3}
+    .dot{width:10px;height:10px;border-radius:50%;background:#666;flex:0 0 10px}
+    .dot.ok{background:var(--ok);box-shadow:0 0 10px rgba(45,216,129,.8)}
+    .dot.warn{background:var(--warn);box-shadow:0 0 10px rgba(255,190,85,.8)}
+    .dot.bad{background:var(--bad);box-shadow:0 0 10px rgba(255,78,94,.85)}
+    button{border:1px solid #3a4867;background:#202b41;color:#fff;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+    button:active{transform:scale(.97)}
+    .btn-ghost{background:#1a2337;border-color:#2d3954;color:#c2cce3}
+    .btn-blue{background:linear-gradient(180deg,#5a85ff,#3464ea);border-color:#6a92ff}
+    .btn-warn{background:linear-gradient(180deg,#f5b348,#d88a16);border-color:#ffc36d;color:#1a1300}
+    #triple{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center}
+    #ammoDots{display:flex;gap:6px;flex-wrap:wrap;min-height:12px}
+    .ammo{width:10px;height:10px;border-radius:50%;background:#ffd25b;box-shadow:0 0 8px rgba(255,210,91,.6)}
+    .ammo.spent{background:#3c4660;box-shadow:none}
+    #shakeWrap{margin-top:8px}
+    #shakeBar{width:100%;height:8px;border-radius:999px;background:#1f2738;border:1px solid #2e3952;overflow:hidden}
+    #shakeFill{height:100%;width:0%;background:linear-gradient(90deg,#ff4d5a 0%,#ff9e42 70%,#ffd25b 100%);transition:width .08s linear}
+    #fireBtn{width:100%;height:100%;min-height:220px;border-radius:18px;border:1px solid #78252e;background:radial-gradient(120% 120% at 50% 20%,rgba(255,170,170,.2),rgba(255,170,170,0) 40%),radial-gradient(160% 120% at 50% 100%,#9d121b 0%,#5d080e 45%,#180204 100%);display:grid;place-items:center;text-align:center;box-shadow:inset 0 0 60px rgba(0,0,0,.45),0 10px 24px rgba(0,0,0,.4)}
+    #fireBig{font-size:clamp(30px,11vw,48px);font-weight:900;letter-spacing:.16em;text-transform:uppercase;line-height:1}
+    #fireSmall{margin-top:8px;font-size:12px;color:#ffd7dc;letter-spacing:.12em;text-transform:uppercase}
+    #bottom{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    #toast{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);background:rgba(20,26,38,.95);border:1px solid var(--line);color:#dbe4ff;border-radius:10px;padding:8px 10px;font-size:12px;opacity:0;pointer-events:none;transition:opacity .16s ease}
+    #toast.show{opacity:1}
+    #flash{position:fixed;inset:0;pointer-events:none;opacity:0;background:rgba(255,120,80,.26)}
+    #flash.show{animation:flashOut .14s ease-out}
+    @keyframes flashOut{0%{opacity:1}100%{opacity:0}}
+  </style>
+</head>
+<body></body>
+  <div id="app">
+    <div class="card">
+      <div class="row space">
+        <div class="title">Nightfall Controller v2</div>
+        <div class="row">
+          <span id="wsDot" class="dot warn"></span>
+          <span id="wsText" style="font-size:12px;color:var(--muted)">Connecting</span>
+        </div>
+      </div>
+      <div id="hostText" class="sub">Server: waiting…</div>
+    </div>
+
+    <div class="card" id="triple">
+      <div></div>
+        <div class="title">Link</div>
+        <div id="linkSub" class="sub">Not linked to game</div>
+      </div>
+      <div class="row">
+        <span id="ctrlDot" class="dot bad"></span>
+        <span id="ctrlText" style="font-size:12px;color:var(--muted)">No Link</span>
+      </div>
+      <button id="reconnectBtn" class="btn-ghost">Reconnect</button>
+    </div>
+
+    <div class="card" id="triple">
+      <div>
+        <div</div> class="title">Motion Sensors</div>
+        <div id="sensorSub" class="sub">Tap Enable Motion</div>
+      </div>
+      <div class="row">
+        <span id="sensorDot" class="dot warn"></span>
+        <span id="sensorText" style="font-size:12px;color:var(--muted)">Off</span>
+      </div>
+      <button id="enableMotionBtn" class="btn-blue">Enable Motion</button>
+    </div>
+
+    <div style="display:grid;grid-template-rows:auto auto 1fr;gap:10px;min-height:0">
+      <div class="card row space">
+        <div id="ammoDots"></div>
+        <div style="font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">Tilt = Look</div>
+      </div>
+
+      <div class="card">
+        <div class="row space">
+          <span style="font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">Shake intensity</span>
+          <span id="shakePct" style="font-size:11px;color:var(--muted)">0%</span>
+        </div>
+        <div id="shakeWrap">
+          <div id="shakeBar"><div id="shakeFill"></div></div>
+        </div>
+      </div>
+
+      <button id="fireBtn" aria-label="Fire">
+        <div>
+          <div id="fireBig">Fire</</div>div>
+          <div id="fireSmall">Tap or shake</div>
+        </div>
+      </button>
+    </div>
+
+    <div id="bottom">
+      <button id="reloadBtn" class="btn-warn">Reload</button>
+      <button id="calibrateBtn">Calibrate</button>
+    </div>
+  </div>
+
+  <div id="flash"></div>
+  <div id="toast"></div>
+
+  <script>
+    const</script> hostText = document.getElementById("hostText");
+    const wsDot = document.getElementById("wsDot");
+    const wsText = document.getElementById("wsText");
+    const ctrlDot = document.getElementById("ctrlDot");
+    const ctrlText = document.getElementById("ctrlText");
+    const linkSub = document.getElementById("linkSub");
+    const sensorDot = document.getElementById("sensorDot");
+    const sensorText = document.getElementById("sensorText");
+    const sensorSub = document.getElementById("sensorSub");
+    const reconnectBtn = document.getElementById("reconnectBtn");
+    const enableMotionBtn = document.getElementById("enableMotionBtn");
+    const calibrateBtn = document.getElementById("calibrateBtn");
+    const reloadBtn = document.getElementById("reloadBtn");
+    const fireBtn = document.getElementById("fireBtn");
+    const fireSmall = document.getElementById("fireSmall");
+    const ammoDots = document.getElementById("ammoDots");
+    const shakeFill = document.getElementById("shakeFill");
+    const shakePct = document.getElementById("shakePct");
+    const flash = document.getElementById("flash");
+    const toast = document.getElementById("toast");
+
+    let ws = null, wsReady = false, reconnectTimer = null, reconnectAttempts = 0;
+    let motionEnabled = false, orientationEnabled = false;
+    let fireCooldown = false;
+    const FIRE_COOLDOWN_MS = 300;
+    let lastAx=0,lastAy=0,lastAz=0,lastShakeFireTs=0;
+    const SHAKE_THRESHOLD = 17.5, SHAKE_COOLDOWN_MS = 360;
+    let lastAlpha=null,lastBeta=null,lookSendLastTs=0;
+    const LOOK_SEND_MIN_MS=28, LOOK_SCALE=0.7;
+
+    function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+    function setDot(el, state){ el.className = "dot " + state; }
+    function wsUrl(){ return (location.protocol === "https:" ? "wss://" : "ws://") + location.host; }
+
+    function showToast(msg, ms=1600){
+      toast.textContent = msg;
+      toast.classList.add("show");
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => toast.classList.remove("show"), ms);
+    }
+
+    function pulseFlash(){
+      flash.classList.remove("show");
+      void flash.offsetWidth;
+      flash.classList.add("show");
+    }
+
+    function setWsState(state, text){ setDot(wsDot,state); wsText.textContent = text; }
+    function setCtrlState(linked){
+      if(linked){ setDot(ctrlDot,"ok"); ctrlText.textContent="Linked"; linkSub.textContent="Controller commands are reaching the game"; }
+      else { setDot(ctrlDot,"bad"); ctrlText.textContent="No Link"; linkSub.textContent="Not linked to game yet"; }
+    }
+    function setSensorState(stateText, subText, mode){
+      setDot(sensorDot, mode);
+      sensorText.textContent = stateText;
+      sensorSub.textContent = subText;
+    }
+
+    function send(obj){
+      if(!ws || ws.readyState !== WebSocket.OPEN) return false;
+      try { ws.send(JSON.stringify(obj)); return true; } catch { return false; }
+    }
+
+    function renderAmmo(current=10,max=10){
+      ammoDots.innerHTML = "";
+      const m = Math.max(1,max), c = clamp(current,0,m);
+      for(let i=0;i<m;i++){
+        const d = document.createElement("span");
+        d.className = "ammo" + (i>=c ? " spent" : "");
+        ammoDots.appendChild(d);
+      }
+    }
+
+    function clearReconnectTimer(){ if(reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null; } }
+    function scheduleReconnect(){
+      clearReconnectTimer();
+      const delay = Math.min(1200 + reconnectAttempts*800, 6000);
+      reconnectTimer = setTimeout(connectWS, delay);
+    }
+
+    function connectWS(){
+      clearReconnectTimer();
+      reconnectAttempts += 1;
+      setWsState("warn","Connecting");
+      setCtrlState(false);
+      hostText.textContent = "Server: " + location.origin;
+
+      try { ws = new WebSocket(wsUrl()); }
+      catch { setWsState("bad","Error"); scheduleReconnect(); return; }
+
+      ws.onopen = () => {
+        wsReady = true;
+        reconnectAttempts = 0;
+        setWsState("ok","Connected");
+        setCtrlState(true);
+        send({ type:"register", role:"controller" });
+        showToast("Controller connected");
+      };
+
+      ws.onmessage = (e) => {
+        let msg; try { msg = JSON.parse(e.data); } catch { return; }
+        if(msg.type === "ready") setCtrlState(true);
+        if(msg.type === "ammoSync") renderAmmo(msg.ammo, msg.maxAmmo);
+        if(msg.type === "serverInfo") hostText.textContent = "Game server: http://" + msg.ip + ":" + msg.port;
+      };
+
+      ws.onerror = () => setWsState("bad","Error");
+      ws.onclose = () => {
+        wsReady = false;
+        setWsState("warn","Reconnecting");
+        setCtrlState(false);
+        scheduleReconnect();
+      };
+    }
+
+    reconnectBtn.addEventListener("click", () => {
+      clearReconnectTimer();
+      try { if(ws) ws.close(); } catch {}
+      connectWS();
+      showToast("Reconnect requested");
+    });
+
+    function normAngleDelta(d){
+      let x=d; while(x>180)x-=360; while(x<-180)x+=360; return x;
+    }
+
+    function triggerFire(fromShake){
+      if(fireCooldown) return;
+      fireCooldown = true;
+      setTimeout(()=> fireCooldown=false, FIRE_COOLDOWN_MS);
+
+      send({ type:"fire" });
+      pulseFlash();
+      fireBtn.style.transform = "scale(0.97)";
+      setTimeout(()=> fireBtn.style.transform = "",120);
+      if(navigator.vibrate) navigator.vibrate(28);
+
+      if(fromShake){
+        fireSmall.textContent = "Shake fired";
+        setTimeout(()=> fireSmall.textContent = "Tap or shake", 450);
+      }
+    }
+
+    function triggerReload(){
+      send({ type:"reload" });
+      showToast("Reload sent");
+      if(navigator.vibrate) navigator.vibrate(20);
+    }
+
+    function sendLookDeltas(yawDelta,pitchDelta){
+      if(!wsReady) return;
+      const now = performance.now();
+      if(now - lookSendLastTs < LOOK_SEND_MIN_MS) return;
+      lookSendLastTs = now;
+      if(Math.abs(yawDelta)<0.02 && Math.abs(pitchDelta)<0.02) return;
+      send({ type:"look", yawDelta:yawDelta*LOOK_SCALE, pitchDelta:pitchDelta*LOOK_SCALE });
+    }
+
+    function onMotion(e){
+      const a = (e.acceleration && e.acceleration.x !== null) ? e.acceleration : e.accelerationIncludingGravity;
+      if(!a) return;
+      const x=a.x||0,y=a.y||0,z=a.z||0;
+      const dx=x-lastAx,dy=y-lastAy,dz=z-lastAz;
+      lastAx=x; lastAy=y; lastAz=z;
+      const mag = Math.sqrt(dx*dx+dy*dy+dz*dz);
+      const pct = clamp((mag/SHAKE_THRESHOLD)*100,0,100);
+      shakeFill.style.width = pct.toFixed(0)+"%";
+      shakePct.textContent = pct.toFixed(0)+"%";
+
+      const now = Date.now();
+      if(mag > SHAKE_THRESHOLD && now-lastShakeFireTs > SHAKE_COOLDOWN_MS){
+        lastShakeFireTs = now;
+        triggerFire(true);
+      }
+    }
+
+    function onOrientation(e){
+      if(typeof e.alpha !== "number" || typeof e.beta !== "number") return;
+      const alpha=e.alpha,beta=e.beta;
+      if(lastAlpha===null || lastBeta===null){ lastAlpha=alpha; lastBeta=beta; return; }
+      const da=normAngleDelta(alpha-lastAlpha);
+      const db=normAngleDelta(beta-lastBeta);
+      lastAlpha=alpha; lastBeta=beta;
+      sendLookDeltas(-da, db);
+    }
+
+    function calibrateNow(){
+      lastAlpha = null;
+      lastBeta = null;
+      send({ type:"calibrate" }); // optional, harmless if ignored
+      showToast("Calibration reset");
+    }
+
+    async function requestMotionPermissionIfNeeded(){
+      let grantedSomething = false;
+      const hasMotionReq = typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function";
+      const hasOrientReq = typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function";
+      if(!hasMotionReq && !hasOrientReq) return true;
+
+      try { if(hasMotionReq){ const r=await DeviceMotionEvent.requestPermission(); if(r==="granted") grantedSomething=true; } } catch {}
+      try { if(hasOrientReq){ const r=await DeviceOrientationEvent.requestPermission(); if(r==="granted") grantedSomething=true; } } catch {}
+      return grantedSomething;
+    }
+
+    async function enableMotionSensors(){
+      const granted = await requestMotionPermissionIfNeeded();
+      motionEnabled=false; orientationEnabled=false;
+
+      try{ window.removeEventListener("devicemotion", onMotion); }catch{}
+      try{ window.removeEventListener("deviceorientation", onOrientation); }catch{}
+
+      try{ window.addEventListener("devicemotion", onMotion, {passive:true}); motionEnabled=true; }catch{}
+      try{ window.addEventListener("deviceorientation", onOrientation, {passive:true}); orientationEnabled=true; }catch{}
+
+      if(motionEnabled || orientationEnabled || granted){
+        setSensorState("Enabled","Motion: "+(motionEnabled?"ON":"OFF")+" • Orientation: "+(orientationEnabled?"ON":"OFF"),"ok");
+        enableMotionBtn.textContent = "Re-enable";
+        enableMotionBtn.className = "btn-ghost";
+        showToast("Sensors enabled");
+      } else {
+        setSensorState("Blocked","iOS blocked sensors. Check Safari Motion & Orientation Access.","bad");
+        showToast("Sensors blocked",2200);
+      }
+    }
+
+    fireBtn.addEventListener("touchstart", e=>{ e.preventDefault(); triggerFire(false); }, {passive:false});
+    fireBtn.addEventListener("mousedown", e=>{ e.preventDefault(); triggerFire(false); });
+    reloadBtn.addEventListener("click", triggerReload);
+    calibrateBtn.addEventListener("click", calibrateNow);
+    enableMotionBtn.addEventListener("click", enableMotionSensors);
+
+    renderAmmo(10,10);
+    setWsState("warn","Connecting");
+    setCtrlState(false);
+    setSensorState("Off","Tap Enable Motion to activate shake + tilt","warn");
+    hostText.textContent = "Server: " + location.origin;
+
+    connectWS();
+    setInterval(()=> send({type:"ping", t:Date.now()}), 12000);
+  </script>
+</body>
+</html>

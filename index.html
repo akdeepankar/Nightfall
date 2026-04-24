@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>NIGHTFALL — A Horror Experience</title>
+
+        <!-- Horror font from Google Fonts -->
+        <link
+            href="https://fonts.googleapis.com/css2?family=Creepster&family=Oswald:wght@300;400&display=swap"
+            rel="stylesheet"
+        />
+
+        <!-- Three.js from CDN -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+        <!-- QR code via Google Charts API (used in main.js — no extra library needed) -->
+
+        <style>
+            /* ─────────────────────────────────────────
+         RESET & BASE
+      ───────────────────────────────────────── */
+            *,
+            *::before,
+            *::after {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                overflow: hidden; /* no scrollbars */
+                background: #000;
+                color: #fff;
+                font-family: "Oswald", sans-serif;
+            }
+
+            /* ─────────────────────────────────────────
+         CANVAS — sits behind every overlay
+      ───────────────────────────────────────── */
+            #c {
+                display: block;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                z-index: 0; /* bottom layer */
+                background: #000;
+                pointer-events: none; /* three.js manages its own events */
+            }
+
+            /* ─────────────────────────────────────────
+         OVERLAY — start / title screen
+      ───────────────────────────────────────── */
+            #overlay {
+                position: fixed;
+                inset: 0;
+                z-index: 10;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 16px;
+                background: radial-gradient(
+                    ellipse at center,
+                    rgba(60, 0, 0, 0.85) 0%,
+                    rgba(0, 0, 0, 0.97) 75%
+                );
+                pointer-events: all; /* capture clicks while visible */
+
+                /* subtle flicker animation */
+                animation: flicker 6s infinite;
+            }
+
+            @keyframes flicker {
+                0%,
+                95%,
+                100% {
+                    opacity: 1;
+                }
+                96% {
+                    opacity: 0.88;
+                }
+                97% {
+                    opacity: 1;
+                }
+                98% {
+                    opacity: 0.92;
+                }
+                99% {
+                    opacity: 1;
+                }
+            }
+
+            /* Title */
+            #overlay h1 {
+                font-family: "Creepster", cursive;
+                font-size: clamp(4rem, 12vw, 9rem);
+                letter-spacing: 0.12em;
+                color: #c0000c;
+                text-shadow:
+                    0 0 20px rgba(200, 0, 10, 0.9),
+                    0 0 60px rgba(180, 0, 0, 0.5),
+                    2px 4px 8px #000;
+                user-select: none;
+            }
+
+            /* Subtitle */
+            #overlay .subtitle {
+                font-family: "Oswald", sans-serif;
+                font-weight: 300;
+                font-size: clamp(0.9rem, 2.5vw, 1.4rem);
+                letter-spacing: 0.45em;
+                text-transform: uppercase;
+                color: #888;
+                text-shadow: 0 0 12px rgba(200, 0, 10, 0.4);
+                user-select: none;
+            }
+
+            /* Thin decorative divider */
+            #overlay .divider {
+                width: min(320px, 60vw);
+                height: 1px;
+                background: linear-gradient(
+                    to right,
+                    transparent,
+                    #6b0000,
+                    transparent
+                );
+                margin: 8px 0;
+            }
+
+            /* "Click to Enter" button */
+            #enterBtn {
+                margin-top: 12px;
+                padding: 14px 40px;
+                font-family: "Creepster", cursive;
+                font-size: clamp(1.1rem, 3vw, 1.6rem);
+                letter-spacing: 0.2em;
+                color: #ddd;
+                background: transparent;
+                border: 2px solid #6b0000;
+                cursor: pointer;
+                position: relative;
+                overflow: hidden;
+                transition:
+                    color 0.25s,
+                    border-color 0.25s,
+                    box-shadow 0.25s;
+                text-transform: uppercase;
+            }
+
+            #enterBtn::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: #6b0000;
+                transform: scaleX(0);
+                transform-origin: left;
+                transition: transform 0.3s ease;
+                z-index: -1;
+            }
+
+            #enterBtn:hover {
+                color: #fff;
+                border-color: #c0000c;
+                box-shadow: 0 0 24px rgba(200, 0, 10, 0.6);
+            }
+
+            #enterBtn:hover::before {
+                transform: scaleX(1);
+            }
+
+            #enterBtn:active {
+                transform: scale(0.97);
+            }
+
+            /* Instructions block */
+            #overlay .instructions {
+                margin-top: 10px;
+                font-size: clamp(0.7rem, 1.8vw, 0.9rem);
+                font-weight: 300;
+                letter-spacing: 0.18em;
+                color: #555;
+                text-align: center;
+                line-height: 1.8;
+                user-select: none;
+            }
+
+            #overlay .instructions span {
+                color: #8a8a8a;
+                font-weight: 400;
+            }
+
+            /* ─────────────────────────────────────────
+         JUMP SCARE OVERLAY
+      ───────────────────────────────────────── */
+            #jumpscare {
+                position: fixed;
+                inset: 0;
+                z-index: 100; /* topmost layer */
+                display: none; /* hidden by default — toggled by JS */
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 20px;
+                background: radial-gradient(
+                    ellipse at center,
+                    #7a0000 0%,
+                    #3a0000 40%,
+                    #000 100%
+                );
+                pointer-events: none; /* don't block game input during scare */
+
+                /* blood-drip vignette using box-shadow */
+                box-shadow: inset 0 0 120px rgba(180, 0, 0, 0.9);
+            }
+
+            /* When visible, use flex */
+            #jumpscare.visible {
+                display: flex;
+            }
+
+            #jumpscare .scare-title {
+                font-family: "Creepster", cursive;
+                font-size: clamp(3rem, 10vw, 7rem);
+                color: #fff;
+                letter-spacing: 0.08em;
+                text-shadow:
+                    0 0 30px rgba(255, 255, 255, 0.8),
+                    0 0 80px rgba(255, 0, 0, 0.6),
+                    3px 5px 10px #000;
+                animation: scarePulse 0.15s infinite alternate;
+                user-select: none;
+            }
+
+            @keyframes scarePulse {
+                from {
+                    transform: scale(1);
+                    filter: brightness(1);
+                }
+                to {
+                    transform: scale(1.04);
+                    filter: brightness(1.15);
+                }
+            }
+
+            #jumpscare .scare-sub {
+                font-family: "Oswald", sans-serif;
+                font-size: clamp(1rem, 3vw, 1.8rem);
+                font-weight: 300;
+                letter-spacing: 0.35em;
+                text-transform: uppercase;
+                color: rgba(255, 200, 200, 0.85);
+                text-shadow: 0 0 16px rgba(255, 0, 0, 0.7);
+                user-select: none;
+            }
+
+            #jumpscare .scare-score {
+                font-family: "Oswald", sans-serif;
+                font-size: clamp(0.75rem, 2vw, 1.1rem);
+                font-weight: 300;
+                letter-spacing: 0.25em;
+                text-transform: uppercase;
+                color: rgba(255, 180, 180, 0.7);
+                text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+                user-select: none;
+            }
+
+            /* Horizontal crack line decoration */
+            #jumpscare .crack {
+                width: min(500px, 80vw);
+                height: 2px;
+                background: linear-gradient(
+                    to right,
+                    transparent,
+                    rgba(255, 80, 80, 0.9),
+                    transparent
+                );
+                box-shadow: 0 0 12px rgba(255, 0, 0, 0.6);
+            }
+
+            /* ─────────────────────────────────────────
+         HUD — top-left kill counter
+      ───────────────────────────────────────── */
+            #hud {
+                position: fixed;
+                top: 18px;
+                left: 18px;
+                z-index: 20;
+                display: none; /* shown once game starts */
+                flex-direction: column;
+                gap: 4px;
+                pointer-events: none;
+            }
+
+            #hud.active {
+                display: flex;
+            }
+
+            #hud .hud-label {
+                font-size: 0.65rem;
+                letter-spacing: 0.3em;
+                text-transform: uppercase;
+                color: #555;
+            }
+
+            #hud .hud-value-row {
+                display: flex;
+                align-items: baseline;
+                gap: 8px;
+            }
+
+            #hud .hud-icon {
+                font-size: 1rem;
+                filter: drop-shadow(0 0 4px #c0000c);
+            }
+
+            #scoreVal {
+                font-family: "Oswald", sans-serif;
+                font-size: 1.25rem;
+                font-weight: 400;
+                letter-spacing: 0.1em;
+                color: #fff;
+                text-shadow: 0 0 8px currentColor;
+                transition:
+                    color 0.4s,
+                    text-shadow 0.4s;
+            }
+
+            /* ─────────────────────────────────────────
+         AMMO HUD — bottom-right ammo counter
+      ───────────────────────────────────────── */
+            #ammoHud {
+                position: fixed;
+                bottom: 24px;
+                right: 24px;
+                z-index: 20;
+                display: none; /* shown once game starts */
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 2px;
+                pointer-events: none;
+            }
+
+            #ammoHud.active {
+                display: flex;
+            }
+
+            #ammoHud .ammo-label {
+                font-size: 0.65rem;
+                letter-spacing: 0.3em;
+                text-transform: uppercase;
+                color: #555;
+            }
+
+            #ammoVal {
+                font-family: "Oswald", sans-serif;
+                font-size: 1.6rem;
+                font-weight: 400;
+                letter-spacing: 0.12em;
+                color: #ffd600;
+                text-shadow:
+                    0 0 8px rgba(255, 214, 0, 0.7),
+                    0 0 20px rgba(255, 180, 0, 0.4);
+                transition:
+                    color 0.3s,
+                    text-shadow 0.3s;
+            }
+
+            /* ─────────────────────────────────────────
+         PROXIMITY WARNING — centred top banner
+      ───────────────────────────────────────── */
+            #warning {
+                position: fixed;
+                top: 36px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 25;
+                display: none; /* toggled by JS */
+                font-family: "Creepster", cursive;
+                font-size: clamp(1rem, 3.5vw, 1.8rem);
+                letter-spacing: 0.2em;
+                text-transform: uppercase;
+                color: #ff2222;
+                text-shadow:
+                    0 0 10px rgba(255, 30, 30, 0.9),
+                    0 0 30px rgba(200, 0, 0, 0.6);
+                pointer-events: none;
+                white-space: nowrap;
+
+                /* CSS pulsing glow animation */
+                animation: warnPulse 0.8s ease-in-out infinite;
+            }
+
+            #warning.active {
+                display: block;
+            }
+
+            @keyframes warnPulse {
+                0%,
+                100% {
+                    opacity: 1;
+                    text-shadow:
+                        0 0 10px rgba(255, 30, 30, 0.9),
+                        0 0 30px rgba(200, 0, 0, 0.6);
+                }
+                50% {
+                    opacity: 0.55;
+                    text-shadow:
+                        0 0 4px rgba(255, 30, 30, 0.5),
+                        0 0 10px rgba(200, 0, 0, 0.3);
+                }
+            }
+
+            /* ─────────────────────────────────────────
+         CROSSHAIR (purely CSS, no image needed)
+      ───────────────────────────────────────── */
+            #crosshair {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 15;
+                display: none; /* shown once game starts */
+                width: 16px;
+                height: 16px;
+                pointer-events: none;
+            }
+
+            #crosshair.active {
+                display: block;
+            }
+
+            #crosshair::before,
+            #crosshair::after {
+                content: "";
+                position: absolute;
+                background: rgba(255, 255, 255, 0.55);
+            }
+
+            /* horizontal bar */
+            #crosshair::before {
+                width: 100%;
+                height: 1px;
+                top: 50%;
+                left: 0;
+                transform: translateY(-50%);
+            }
+
+            /* vertical bar */
+            #crosshair::after {
+                width: 1px;
+                height: 100%;
+                left: 50%;
+                top: 0;
+                transform: translateX(-50%);
+            }
+
+            /* ─────────────────────────────────────────
+         PHONE BUTTON — top-right, opens QR panel
+      ───────────────────────────────────────── */
+            #phoneBtn {
+                position: fixed;
+                top: 14px;
+                right: 18px;
+                z-index: 20;
+                display: none; /* shown by JS once server connection confirmed */
+                align-items: center;
+                gap: 7px;
+                background: rgba(0, 0, 0, 0.55);
+                border: 1px solid rgba(200, 0, 10, 0.4);
+                border-radius: 8px;
+                padding: 6px 12px;
+                cursor: pointer;
+                pointer-events: all;
+                font-family: "Oswald", sans-serif;
+                font-size: 0.7rem;
+                letter-spacing: 0.2em;
+                text-transform: uppercase;
+                color: #888;
+                transition:
+                    border-color 0.2s,
+                    color 0.2s;
+            }
+
+            #phoneBtn:hover {
+                border-color: rgba(200, 0, 10, 0.8);
+                color: #ccc;
+            }
+
+            /* Small status dot inside the phone button */
+            #ctrlStatusDot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #555;
+                flex-shrink: 0;
+                transition:
+                    background 0.3s,
+                    box-shadow 0.3s;
+            }
+
+            /* ─────────────────────────────────────────
+         QR PANEL — modal for iPhone controller
+      ───────────────────────────────────────── */
+            #qrPanel {
+                position: fixed;
+                inset: 0;
+                z-index: 50;
+                display: none;
+                align-items: center;
+                justify-content: center;
+                background: rgba(0, 0, 0, 0.82);
+                pointer-events: all;
+            }
+
+            #qrPanel.visible {
+                display: flex;
+            }
+
+            #qrBox {
+                background: #0f0f14;
+                border: 1px solid rgba(200, 0, 10, 0.5);
+                border-radius: 14px;
+                padding: 32px 28px 28px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 18px;
+                max-width: 320px;
+                width: 90vw;
+                box-shadow: 0 0 60px rgba(200, 0, 10, 0.2);
+                position: relative;
+            }
+
+            #qrBox h2 {
+                font-family: "Creepster", cursive;
+                font-size: 1.6rem;
+                letter-spacing: 0.2em;
+                color: #cc0010;
+                text-shadow: 0 0 14px rgba(200, 0, 10, 0.6);
+            }
+
+            #qrBox p {
+                font-size: 0.75rem;
+                font-weight: 300;
+                letter-spacing: 0.12em;
+                color: #666;
+                text-align: center;
+                line-height: 1.7;
+            }
+
+            #qrContainer {
+                width: 220px;
+                height: 220px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #0a0a0f;
+                border-radius: 6px;
+            }
+
+            /* Spinner shown before QR image loads */
+            #qrContainer::before {
+                content: "⟳";
+                font-size: 2rem;
+                color: #333;
+                animation: spin 1s linear infinite;
+            }
+
+            #qrContainer:has(img)::before {
+                display: none;
+            }
+
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            #qrUrl {
+                font-size: 0.65rem;
+                letter-spacing: 0.08em;
+                color: #444;
+                word-break: break-all;
+                text-align: center;
+                max-width: 240px;
+            }
+
+            /* Steps list */
+            #qrBox ol {
+                font-size: 0.72rem;
+                font-weight: 300;
+                letter-spacing: 0.1em;
+                color: #555;
+                line-height: 2;
+                padding-left: 20px;
+                text-align: left;
+                width: 100%;
+            }
+
+            #qrBox ol li span {
+                color: #888;
+            }
+
+            #qrClose {
+                position: absolute;
+                top: 12px;
+                right: 14px;
+                background: none;
+                border: none;
+                color: #444;
+                font-size: 1.2rem;
+                cursor: pointer;
+                line-height: 1;
+                padding: 4px 8px;
+                border-radius: 4px;
+                transition: color 0.15s;
+            }
+
+            #qrClose:hover {
+                color: #aaa;
+            }
+        </style>
+    </head>
+
+    <body>
+        <!-- ═══════════════════════════════════════════
+         THREE.JS RENDER TARGET
+    ════════════════════════════════════════════ -->
+        <canvas id="c"></canvas>
+
+        <!-- ═══════════════════════════════════════════
+         TITLE / START OVERLAY
+    ════════════════════════════════════════════ -->
+        <div id="overlay" role="dialog" aria-label="Game start screen">
+            <h1>NIGHTFALL</h1>
+            <p class="subtitle">A horror experience</p>
+            <div class="divider"></div>
+
+            <button id="enterBtn" aria-label="Enter the game">
+                Click to Enter
+            </button>
+
+            <p class="instructions">
+                <span>WASD</span> — move &nbsp;|&nbsp; <span>Mouse</span> —
+                look<br />
+                <span>Left Click</span> — shoot &nbsp;|&nbsp; <span>R</span> —
+                reload<br />
+                Survive. Kill them all. Don't get caught.
+            </p>
+        </div>
+
+        <!-- ═══════════════════════════════════════════
+         PHONE / CONTROLLER BUTTON  (top-right, hidden until server is live)
+    ════════════════════════════════════════════ -->
+        <button id="phoneBtn" aria-label="Open phone controller QR code">
+            <span id="ctrlStatusDot"></span>
+            📱 Controller
+        </button>
+
+        <!-- ═══════════════════════════════════════════
+         QR PANEL  (shown when phone button clicked)
+    ════════════════════════════════════════════ -->
+        <div id="qrPanel" role="dialog" aria-label="iPhone controller QR code">
+            <div id="qrBox">
+                <button id="qrClose" aria-label="Close">✕</button>
+                <h2>📱 iPhone Control</h2>
+                <p>
+                    Scan with your iPhone camera.<br />Both devices must be on
+                    the same Wi-Fi.
+                </p>
+                <div id="qrContainer"></div>
+                <span id="qrUrl">waiting for server…</span>
+                <ol>
+                    <li>Scan the QR code above</li>
+                    <li>Tap <span>"Enable &amp; Start"</span></li>
+                    <li><span>Shake</span> your phone to fire</li>
+                    <li>Or tap the big red <span>FIRE</span> button</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════
+         JUMP SCARE OVERLAY (hidden by default)
+    ════════════════════════════════════════════ -->
+        <div id="jumpscare" role="alert" aria-live="assertive">
+            <div class="crack"></div>
+            <p class="scare-title">YOU WERE CAUGHT</p>
+            <p class="scare-sub">The horde got you</p>
+            <p class="scare-score">
+                Zombies killed: <span id="scareFinalScore">0</span>
+            </p>
+            <div class="crack"></div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════
+         HUD — kill counter
+    ════════════════════════════════════════════ -->
+        <div id="hud" aria-label="Heads up display">
+            <span class="hud-label">Kills</span>
+            <div class="hud-value-row">
+                <span class="hud-icon">☠</span>
+                <!-- scoreVal is updated every frame by main.js -->
+                <span id="scoreVal">0</span>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════
+         AMMO HUD — bottom-right ammo counter
+    ════════════════════════════════════════════ -->
+        <div id="ammoHud" aria-label="Ammo display">
+            <span class="ammo-label">Ammo</span>
+            <!-- ammoVal is updated by main.js -->
+            <span id="ammoVal">10 / 10</span>
+        </div>
+
+        <!-- ═══════════════════════════════════════════
+         PROXIMITY WARNING BANNER (hidden by default)
+    ════════════════════════════════════════════ -->
+        <div id="warning" role="status" aria-live="polite">⚠ IT IS CLOSE ⚠</div>
+
+        <!-- ═══════════════════════════════════════════
+         CENTRE CROSSHAIR (hidden until game starts)
+    ════════════════════════════════════════════ -->
+        <div id="crosshair" aria-hidden="true"></div>
+
+        <!-- ═══════════════════════════════════════════
+         GAME ENTRY POINT
+    ════════════════════════════════════════════ -->
+        <script defer src="main.js"></script>
+    </body>
+</html>
