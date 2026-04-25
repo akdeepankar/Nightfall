@@ -176,16 +176,16 @@
             }
 
             #main {
-                min-height: 220px;
+                min-height: 0;
                 display: grid;
                 gap: 8px;
-                grid-template-rows: auto auto 1fr;
+                grid-template-rows: auto auto auto;
             }
 
             #fire {
                 width: 100%;
-                height: 100%;
-                min-height: 160px;
+                height: auto;
+                min-height: 80px;
                 border-radius: 14px;
                 border: 1px solid #9f2a34;
                 background:
@@ -275,7 +275,7 @@
                 }
 
                 #main {
-                    grid-template-rows: auto 1fr;
+                    grid-template-rows: auto auto;
                 }
 
                 /* Hide shake meter card on very short screens */
@@ -375,32 +375,15 @@
                             text-transform: uppercase;
                         "
                     >
-                        Move Phone = Look
+                        Point to Move
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="row">
-                        <span style="font-size: 11px; color: var(--muted)"
-                            >Shake</span
-                        >
-                        <span
-                            id="pct"
-                            style="font-size: 11px; color: var(--muted)"
-                            >0%</span
-                        >
+                <div class="card" id="movepad">
+                    <div style="text-align: center; font-size: 11px; color: var(--muted); margin-bottom: 8px;">
+                        Movement Pad
                     </div>
-                    <div
-                        id="sensorCounts"
-                        style="
-                            margin-top: 4px;
-                            font-size: 11px;
-                            color: var(--muted);
-                        "
-                    >
-                        M: 0 • O: 0
-                    </div>
-                    <div id="bar"><div id="fill"></div></div>
+                    <div id="movepadCanvas" style="width: 100%; aspect-ratio: 1 / 1; background: radial-gradient(circle at 50% 50%, #2a4070 0%, #0f1420 100%); border: 1px solid #334463; border-radius: 8px; position: relative; cursor: crosshair; touch-action: none;"></div>
                 </div>
 
                 <button id="fire" aria-label="Fire">Fire</button>
@@ -441,24 +424,6 @@
 
             let cool = false;
             let lastSend = 0;
-            let lastShake = 0,
-                ax = 0,
-                ay = 0,
-                az = 0;
-
-            // Drift-free motion look uses acceleration deltas (jerk), not absolute baseline.
-            let smoothDX = 0,
-                smoothDY = 0;
-
-            let motionEventCount = 0;
-            let orientationEventCount = 0;
-
-            const SHAKE = 8.5;
-            const SHAKECD = 260;
-            const LOOKMS = 28;
-            const LOOKS = 2.2;
-            const MOTION_DEADZONE = 0.12;
-            const MOTION_SMOOTH = 0.2;
 
             const send = (o) => {
                 if (ws && ws.readyState === 1) ws.send(JSON.stringify(o));
@@ -584,265 +549,128 @@
             let orientationEventSeen = false;
             let enableCheckTimer = null;
 
-            function onMotion(e) {
-                motionEventSeen = true;
-                motionEventCount++;
-                if (sensorCounts)
-                    sensorCounts.textContent =
-                        "M: " +
-                        motionEventCount +
-                        " • O: " +
-                        orientationEventCount;
+            // ─── Movement Pad Variables ────────────────────────────────────────
+            let movepadElement = null;
+            let currentTouchId = null;
+            let lastMoveSend = 0;
+            const MOVE_SEND_MS = 28; // throttle movement updates
 
-                // Use accelerationIncludingGravity for broad support.
-                const source =
-                    e.accelerationIncludingGravity &&
-                    typeof e.accelerationIncludingGravity.x === "number"
-                        ? e.accelerationIncludingGravity
-                        : e.acceleration && typeof e.acceleration.x === "number"
-                          ? e.acceleration
-                          : null;
+            function setupMovePad() {
+                movepadElement = el("movepadCanvas");
+                if (!movepadElement) return;
 
-                if (!source) return;
+                // Touch events
+                movepadElement.addEventListener("touchstart", onMovepadTouchStart, { passive: false });
+                movepadElement.addEventListener("touchmove", onMovepadTouchMove, { passive: false });
+                movepadElement.addEventListener("touchend", onMovepadTouchEnd, { passive: false });
 
-                const x = source.x || 0,
-                    y = source.y || 0,
-                    z = source.z || 0;
-
-                // Drift-free look control:
-                // use acceleration deltas (jerk) so view doesn't keep drifting upward.
-                const dx = x - ax,
-                    dy = y - ay,
-                    dz = z - az;
-
-                // Sideways phone movement -> yaw, up/down movement -> pitch
-                // Corrected direction: invert both axes to match natural camera response.
-                let lookX = dx;
-                let lookY = dy;
-
-                // Deadzone to avoid micro jitter
-                if (Math.abs(lookX) < MOTION_DEADZONE) lookX = 0;
-                if (Math.abs(lookY) < MOTION_DEADZONE) lookY = 0;
-
-                // Exponential smoothing on deltas
-                smoothDX += (lookX - smoothDX) * MOTION_SMOOTH;
-                smoothDY += (lookY - smoothDY) * MOTION_SMOOTH;
-
-                // Send motion look deltas
-                sendLook(-smoothDX, -smoothDY);
-
-                // Keep shake-to-fire using derivative magnitude
-                ax = x;
-                ay = y;
-                az = z;
-
-                const mag = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                const p = Math.max(0, Math.min(100, (mag / SHAKE) * 100));
-                fill.style.width = p.toFixed(0) + "%";
-                pct.textContent = p.toFixed(0) + "%";
-
-                const now = Date.now();
-                if (mag > SHAKE && now - lastShake > SHAKECD) {
-                    lastShake = now;
-                    fireNow(true);
-                }
+                // Mouse events (for desktop testing)
+                movepadElement.addEventListener("mousedown", onMovepadMouseDown);
+                movepadElement.addEventListener("mousemove", onMovepadMouseMove);
+                movepadElement.addEventListener("mouseup", onMovepadMouseUp);
+                movepadElement.addEventListener("mouseleave", onMovepadMouseUp);
             }
 
-            function sendLook(yawDelta, pitchDelta) {
+            function getMovepadCenter() {
+                if (!movepadElement) return { x: 0, y: 0 };
+                const rect = movepadElement.getBoundingClientRect();
+                return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            }
+
+            function calculateMovementDirection(x, y) {
+                const center = getMovepadCenter();
+                const rect = movepadElement.getBoundingClientRect();
+                const dx = x - center.x;
+                const dy = y - center.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                // Normalize to 360 degrees (atan2 returns -PI to PI)
+                let angle = Math.atan2(dy, dx);
+                // Convert to 0-360 degrees (0 = right, 90 = down, 180 = left, 270 = up)
+                angle = (angle * 180) / Math.PI;
+                if (angle < 0) angle += 360;
+                
+                // Clamped magnitude (0-1)
+                const radius = Math.min(rect.width, rect.height) / 2;
+                const magnitude = Math.max(0, Math.min(1, dist / radius));
+                
+                return { angle, magnitude, dx, dy, dist };
+            }
+
+            function sendMovement(angle, magnitude) {
                 if (!ready) return;
                 const now = performance.now();
-                if (now - lastSend < LOOKMS) return;
-                lastSend = now;
-                if (Math.abs(yawDelta) < 0.02 && Math.abs(pitchDelta) < 0.02)
+                if (now - lastMoveSend < MOVE_SEND_MS) return;
+                lastMoveSend = now;
+
+                // Only send if there's actual movement (deadzone: magnitude > 0.05)
+                if (magnitude < 0.05) {
+                    send({ type: "move", angle: 0, magnitude: 0 });
                     return;
-                send({
-                    type: "look",
-                    yawDelta: yawDelta * LOOKS,
-                    pitchDelta: pitchDelta * LOOKS,
-                });
+                }
+
+                send({ type: "move", angle, magnitude });
             }
 
-            function onOrientation(e) {
-                // Orientation listener kept only as diagnostics signal.
-                // Actual camera control now comes from phone movement (devicemotion).
-                if (
-                    typeof e.alpha !== "number" &&
-                    typeof e.beta !== "number" &&
-                    typeof e.gamma !== "number"
-                )
-                    return;
-
-                orientationEventSeen = true;
-                orientationEventCount++;
-                if (sensorCounts)
-                    sensorCounts.textContent =
-                        "M: " +
-                        motionEventCount +
-                        " • O: " +
-                        orientationEventCount;
+            function onMovepadMouseDown(e) {
+                currentTouchId = "mouse";
+                const movement = calculateMovementDirection(e.clientX, e.clientY);
+                sendMovement(movement.angle, movement.magnitude);
             }
 
-            function finalizeSensorState(granted) {
-                clearTimeout(enableCheckTimer);
+            function onMovepadMouseMove(e) {
+                if (currentTouchId !== "mouse") return;
+                const movement = calculateMovementDirection(e.clientX, e.clientY);
+                sendMovement(movement.angle, movement.magnitude);
+            }
 
-                // Require real events before claiming enabled.
-                const hasRealSignal = motionEventSeen || orientationEventSeen;
-
-                if (hasRealSignal) {
-                    setDot(sensorDot, "ok");
-                    sensorTxt.textContent = "Enabled";
-                    sensorSub.textContent =
-                        "M:" +
-                        (motionEventSeen ? "ON" : "OFF") +
-                        " • O:" +
-                        (orientationEventSeen ? "ON" : "OFF");
-                    el("enable").textContent = "Re-enable";
-                    showToast("Sensors enabled");
-                } else if (granted) {
-                    setDot(sensorDot, "warn");
-                    sensorTxt.textContent = "Waiting";
-                    sensorSub.textContent = "No stream yet";
-                    showToast("No sensor stream detected", 2200);
-                } else {
-                    setDot(sensorDot, "bad");
-                    sensorTxt.textContent = "Blocked";
-                    sensorSub.textContent = "Denied/Blocked";
-                    showToast("Sensors blocked", 2200);
+            function onMovepadMouseUp() {
+                if (currentTouchId === "mouse") {
+                    currentTouchId = null;
+                    sendMovement(0, 0);
                 }
             }
 
-            async function enableMotion() {
-                let granted = false;
-                let askedMotion = false;
-                let askedOrientation = false;
-                let promptApiMissing = false;
+            function onMovepadTouchStart(e) {
+                e.preventDefault();
+                if (e.touches.length === 0) return;
+                currentTouchId = e.touches[0].identifier;
+                const touch = e.touches[0];
+                const movement = calculateMovementDirection(touch.clientX, touch.clientY);
+                sendMovement(movement.angle, movement.magnitude);
+            }
 
-                motionEventSeen = false;
-                orientationEventSeen = false;
-                motionEventCount = 0;
-                orientationEventCount = 0;
-                if (sensorCounts) sensorCounts.textContent = "M: 0 • O: 0";
-
-                // Secure-context diagnostics (MDN guidance): many sensor APIs are restricted.
-                const isSecureContextLike =
-                    window.isSecureContext ||
-                    location.hostname === "localhost" ||
-                    location.hostname === "127.0.0.1";
-
-                if (!isSecureContextLike) {
-                    setDot(sensorDot, "bad");
-                    sensorTxt.textContent = "Insecure Context";
-                    sensorSub.textContent = "Need HTTPS";
-                }
-
-                // iOS explicit permission requests (must be inside user gesture).
-                // NOTE: iOS may NOT always show a popup:
-                // - if permission was already granted previously
-                // - if it was denied and persisted by browser settings
-                // - if this browser context does not expose the prompt API
-                try {
-                    if (typeof DeviceMotionEvent !== "undefined") {
-                        if (
-                            typeof DeviceMotionEvent.requestPermission ===
-                            "function"
-                        ) {
-                            askedMotion = true;
-                            const r =
-                                await DeviceMotionEvent.requestPermission();
-                            if (r === "granted") granted = true;
-                        } else {
-                            promptApiMissing = true;
-                        }
-                    } else {
-                        promptApiMissing = true;
+            function onMovepadTouchMove(e) {
+                e.preventDefault();
+                if (e.touches.length === 0) return;
+                
+                let activeTouch = null;
+                for (let touch of e.touches) {
+                    if (touch.identifier === currentTouchId) {
+                        activeTouch = touch;
+                        break;
                     }
-                } catch (err) {
-                    sensorSub.textContent = "Motion error";
                 }
-
-                try {
-                    if (typeof DeviceOrientationEvent !== "undefined") {
-                        if (
-                            typeof DeviceOrientationEvent.requestPermission ===
-                            "function"
-                        ) {
-                            askedOrientation = true;
-                            const r =
-                                await DeviceOrientationEvent.requestPermission();
-                            if (r === "granted") granted = true;
-                        } else {
-                            promptApiMissing = true;
-                        }
-                    } else {
-                        promptApiMissing = true;
-                    }
-                } catch (err) {
-                    sensorSub.textContent = "Orientation error";
-                }
-
-                let m = false,
-                    o = false;
-
-                try {
-                    window.removeEventListener("devicemotion", onMotion);
-                } catch {}
-                try {
-                    window.removeEventListener(
-                        "deviceorientation",
-                        onOrientation,
-                    );
-                } catch {}
-
-                try {
-                    window.addEventListener("devicemotion", onMotion, {
-                        passive: true,
-                    });
-                    m = true;
-                } catch {}
-                try {
-                    // MDN: deviceorientation can expose `absolute` and alpha/beta/gamma.
-                    // We keep one listener and handle fallbacks inside onOrientation.
-                    window.addEventListener(
-                        "deviceorientation",
-                        onOrientation,
-                        { passive: true },
-                    );
-                    o = true;
-                } catch {}
-
-                if (promptApiMissing && !askedMotion && !askedOrientation) {
-                    setDot(sensorDot, "warn");
-                    sensorTxt.textContent = "No Prompt API";
-                    sensorSub.textContent = "No prompt API";
-                }
-
-                if (m || o || granted) {
-                    setDot(sensorDot, "warn");
-                    sensorTxt.textContent = "Checking";
-                    sensorSub.textContent = "Listening...";
-                    el("enable").textContent = "Re-enable";
-                } else {
-                    setDot(sensorDot, "bad");
-                    sensorTxt.textContent = "Blocked";
-                    sensorSub.textContent = "Denied/Unavailable";
-                    showToast("Sensors blocked", 2200);
-                    return;
-                }
-
-                enableCheckTimer = setTimeout(() => {
-                    finalizeSensorState(granted);
-                }, 2500);
+                
+                if (!activeTouch) return;
+                const movement = calculateMovementDirection(activeTouch.clientX, activeTouch.clientY);
+                sendMovement(movement.angle, movement.magnitude);
             }
 
-            function calibrate() {
-                smoothDX = 0;
-                smoothDY = 0;
-                ax = 0;
-                ay = 0;
-                az = 0;
-                // Keep existing stream flags so UI remains accurate.
-                send({ type: "calibrate" }); // optional; desktop may ignore
-                showToast("Motion control reset");
+            function onMovepadTouchEnd(e) {
+                e.preventDefault();
+                let stillHasTouch = false;
+                for (let touch of e.touches) {
+                    if (touch.identifier === currentTouchId) {
+                        stillHasTouch = true;
+                        break;
+                    }
+                }
+                
+                if (!stillHasTouch) {
+                    currentTouchId = null;
+                    sendMovement(0, 0);
+                }
             }
 
             el("reconnect").onclick = () => {
@@ -854,10 +682,7 @@
             };
 
             el("enable").onclick = async () => {
-                setDot(sensorDot, "warn");
-                sensorTxt.textContent = "Requesting";
-                sensorSub.textContent = "Requesting...";
-                await enableMotion();
+                showToast("Movement pad ready!");
             };
             el("start").onclick = () => {
                 send({ type: "start" });
@@ -867,22 +692,14 @@
                 send({ type: "reload" });
                 showToast("Reload sent");
             };
-            el("cal").onclick = calibrate;
+            el("cal").onclick = () => {
+                showToast("Calibration not needed");
+            };
 
             fire.addEventListener(
                 "touchstart",
                 (e) => {
                     e.preventDefault();
-
-                    // Auto-attempt sensor enable on first FIRE touch so users don't
-                    // need a separate step before motion starts working.
-                    if (!motionEventSeen && !orientationEventSeen) {
-                        setDot(sensorDot, "warn");
-                        sensorTxt.textContent = "Requesting";
-                        sensorSub.textContent = "Requesting...";
-                        enableMotion();
-                    }
-
                     fireNow(false);
                 },
                 { passive: false },
@@ -893,6 +710,7 @@
             });
 
             renderAmmo(10, 10);
+            setupMovePad();
             connect();
             setInterval(() => send({ type: "ping", t: Date.now() }), 12000);
         </script>
