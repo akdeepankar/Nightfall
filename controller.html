@@ -155,23 +155,6 @@
                 background: #fde047;
                 box-shadow: 0 0 8px rgba(253, 224, 71, 0.6);
             }
-            .move-btn {
-                background: #2a3b5f;
-                border: 1px solid #4d638e;
-                color: #fff;
-                border-radius: 6px;
-                font-size: 16px;
-                font-weight: bold;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                touch-action: none;
-            }
-            .move-btn:active {
-                background: #1e2a4a;
-                transform: scale(0.95);
-            }
-
             #bar {
                 height: 8px;
                 background: #0f172a;
@@ -420,21 +403,6 @@
                     <div id="bar"><div id="fill"></div></div>
                 </div>
 
-                <div class="card">
-                    <div style="font-size: 11px; color: var(--muted); text-align: center; margin-bottom: 8px;">Movement</div>
-                    <div id="movement" style="display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; gap: 4px; width: 100%; height: 80px;">
-                        <div></div>
-                        <button id="move-w" class="move-btn" data-dir="w">↑</button>
-                        <div></div>
-                        <button id="move-a" class="move-btn" data-dir="a">←</button>
-                        <div></div>
-                        <button id="move-d" class="move-btn" data-dir="d">→</button>
-                        <div></div>
-                        <button id="move-s" class="move-btn" data-dir="s">↓</button>
-                        <div></div>
-                    </div>
-                </div>
-
                 <button id="fire" aria-label="Fire">Fire</button>
             </div>
 
@@ -615,6 +583,9 @@
             let motionEventSeen = false;
             let orientationEventSeen = false;
             let enableCheckTimer = null;
+            let lastOrientationAlpha = null;
+            let lastOrientationBeta = null;
+            let lastOrientationGamma = null;
 
             function onMotion(e) {
                 motionEventSeen = true;
@@ -641,29 +612,10 @@
                     y = source.y || 0,
                     z = source.z || 0;
 
-                // Drift-free look control:
-                // use acceleration deltas (jerk) so view doesn't keep drifting upward.
+                // Keep shake-to-fire using derivative magnitude.
                 const dx = x - ax,
                     dy = y - ay,
                     dz = z - az;
-
-                // Sideways phone movement -> yaw, up/down movement -> pitch
-                // Corrected direction: invert both axes to match natural camera response.
-                let lookX = dx;
-                let lookY = dy;
-
-                // Deadzone to avoid micro jitter
-                if (Math.abs(lookX) < MOTION_DEADZONE) lookX = 0;
-                if (Math.abs(lookY) < MOTION_DEADZONE) lookY = 0;
-
-                // Exponential smoothing on deltas
-                smoothDX += (lookX - smoothDX) * MOTION_SMOOTH;
-                smoothDY += (lookY - smoothDY) * MOTION_SMOOTH;
-
-                // Send motion look deltas
-                sendLook(-smoothDX, -smoothDY);
-
-                // Keep shake-to-fire using derivative magnitude
                 ax = x;
                 ay = y;
                 az = z;
@@ -695,11 +647,9 @@
             }
 
             function onOrientation(e) {
-                // Orientation listener kept only as diagnostics signal.
-                // Actual camera control now comes from phone movement (devicemotion).
                 if (
-                    typeof e.alpha !== "number" &&
-                    typeof e.beta !== "number" &&
+                    typeof e.alpha !== "number" ||
+                    typeof e.beta !== "number" ||
                     typeof e.gamma !== "number"
                 )
                     return;
@@ -712,6 +662,29 @@
                         motionEventCount +
                         " • O: " +
                         orientationEventCount;
+
+                const alpha = e.alpha;
+                const beta = e.beta;
+
+                if (lastOrientationAlpha === null) {
+                    lastOrientationAlpha = alpha;
+                    lastOrientationBeta = beta;
+                    lastOrientationGamma = e.gamma;
+                    return;
+                }
+
+                let dAlpha = alpha - lastOrientationAlpha;
+                let dBeta = beta - lastOrientationBeta;
+
+                if (dAlpha > 180) dAlpha -= 360;
+                if (dAlpha < -180) dAlpha += 360;
+
+                lastOrientationAlpha = alpha;
+                lastOrientationBeta = beta;
+                lastOrientationGamma = e.gamma;
+
+                // Use device orientation to drive camera yaw. Pitch is ignored on the game side.
+                sendLook(-dAlpha * 0.3, 0);
             }
 
             function finalizeSensorState(granted) {
@@ -872,6 +845,9 @@
                 ax = 0;
                 ay = 0;
                 az = 0;
+                lastOrientationAlpha = null;
+                lastOrientationBeta = null;
+                lastOrientationGamma = null;
                 // Keep existing stream flags so UI remains accurate.
                 send({ type: "calibrate" }); // optional; desktop may ignore
                 showToast("Motion control reset");
@@ -922,32 +898,6 @@
             fire.addEventListener("mousedown", (e) => {
                 e.preventDefault();
                 fireNow(false);
-            });
-
-            // Movement buttons
-            document.querySelectorAll('.move-btn').forEach(btn => {
-                const dir = btn.dataset.dir;
-                const start = () => send({ type: "move", direction: dir });
-                const stop = () => send({ type: "stop", direction: dir });
-                btn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    start();
-                });
-                btn.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    stop();
-                });
-                btn.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    start();
-                });
-                btn.addEventListener('mouseup', (e) => {
-                    e.preventDefault();
-                    stop();
-                });
-                btn.addEventListener('mouseleave', (e) => {
-                    stop();
-                });
             });
 
             renderAmmo(10, 10);
