@@ -170,35 +170,11 @@
                 transition: width 0.08s linear;
             }
 
-            #joystickContainer {
-                width: 80px;
-                height: 80px;
-                border-radius: 50%;
-                background: rgba(42, 59, 95, 0.5);
-                border: 2px solid #4d638e;
-                position: relative;
-                margin: 0 auto;
-                touch-action: none;
-            }
-
-            #joystick {
-                width: 30px;
-                height: 30px;
-                border-radius: 50%;
-                background: #2a3b5f;
-                border: 1px solid #4d638e;
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                transition: transform 0.1s;
-            }
-
             #main {
                 min-height: 0;
                 display: grid;
                 gap: 8px;
-                grid-template-rows: auto auto auto auto auto;
+                grid-template-rows: auto auto auto auto;
             }
 
             #fire {
@@ -428,11 +404,6 @@
                 </div>
 
                 <button id="fire" aria-label="Fire">Fire</button>
-
-                <!-- Joystick for movement -->
-                <div id="joystickContainer">
-                    <div id="joystick"></div>
-                </div>
             </div>
 
             <div id="bottom">
@@ -468,6 +439,7 @@
             let retry = null;
             let retries = 0;
 
+            let cool = false;
             let lastSend = 0;
             let lastShake = 0,
                 ax = 0,
@@ -480,7 +452,6 @@
 
             let motionEventCount = 0;
             let orientationEventCount = 0;
-            let lastSendOrientation = 0;
 
             const SHAKE = 8.5;
             const SHAKECD = 260;
@@ -695,15 +666,10 @@
 
                 const alpha = e.alpha;
 
-                lastOrientationAlpha = alpha;
-                lastOrientationBeta = e.beta;
-                lastOrientationGamma = e.gamma;
-
-                if (baselineAlpha === null) return;
-
-                const now = performance.now();
-                if (now - lastSendOrientation < LOOKMS) return;
-                lastSendOrientation = now;
+                if (baselineAlpha === null) {
+                    baselineAlpha = alpha;
+                    return;
+                }
 
                 let relativeAlpha = alpha - baselineAlpha;
                 if (relativeAlpha > 180) relativeAlpha -= 360;
@@ -874,7 +840,10 @@
                 ax = 0;
                 ay = 0;
                 az = 0;
-                baselineAlpha = lastOrientationAlpha;
+                lastOrientationAlpha = null;
+                lastOrientationBeta = null;
+                lastOrientationGamma = null;
+                baselineAlpha = null;
                 // Keep existing stream flags so UI remains accurate.
                 send({ type: "calibrate" }); // optional; desktop may ignore
                 showToast("Motion control reset");
@@ -925,91 +894,6 @@
             fire.addEventListener("mousedown", (e) => {
                 e.preventDefault();
                 fireNow(false);
-            });
-
-            // Joystick for movement
-            const joystick = el("joystick");
-            const joystickContainer = el("joystickContainer");
-            let joystickActive = false;
-            let currentDirection = null;
-
-            function updateJoystickPosition(x, y) {
-                const rect = joystickContainer.getBoundingClientRect();
-                const centerX = rect.width / 2;
-                const centerY = rect.height / 2;
-                const dx = x - rect.left - centerX;
-                const dy = y - rect.top - centerY;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const maxDistance = centerX - 15; // keep inside
-                const clampedDistance = Math.min(distance, maxDistance);
-                const angle = Math.atan2(dy, dx);
-                const clampedX = Math.cos(angle) * clampedDistance;
-                const clampedY = Math.sin(angle) * clampedDistance;
-
-                joystick.style.transform = `translate(${centerX + clampedX - 15}px, ${centerY + clampedY - 15}px)`;
-
-                // Determine direction: if dragged beyond threshold, move forward (w)
-                if (clampedDistance > 10) {
-                    if (currentDirection !== 'w') {
-                        if (currentDirection) send({ type: "stop", direction: currentDirection });
-                        send({ type: "move", direction: 'w' });
-                        currentDirection = 'w';
-                    }
-                } else {
-                    if (currentDirection) {
-                        send({ type: "stop", direction: currentDirection });
-                        currentDirection = null;
-                    }
-                }
-            }
-
-            function resetJoystick() {
-                joystick.style.transform = 'translate(-50%, -50%)';
-                if (currentDirection) {
-                    send({ type: "stop", direction: currentDirection });
-                    currentDirection = null;
-                }
-                joystickActive = false;
-            }
-
-            joystickContainer.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                joystickActive = true;
-                updateJoystickPosition(e.touches[0].clientX, e.touches[0].clientY);
-            });
-
-            joystickContainer.addEventListener('touchmove', (e) => {
-                e.preventDefault();
-                if (joystickActive) {
-                    updateJoystickPosition(e.touches[0].clientX, e.touches[0].clientY);
-                }
-            });
-
-            joystickContainer.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                resetJoystick();
-            });
-
-            joystickContainer.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                joystickActive = true;
-                updateJoystickPosition(e.clientX, e.clientY);
-            });
-
-            joystickContainer.addEventListener('mousemove', (e) => {
-                e.preventDefault();
-                if (joystickActive) {
-                    updateJoystickPosition(e.clientX, e.clientY);
-                }
-            });
-
-            joystickContainer.addEventListener('mouseup', (e) => {
-                e.preventDefault();
-                resetJoystick();
-            });
-
-            joystickContainer.addEventListener('mouseleave', (e) => {
-                if (joystickActive) resetJoystick();
             });
 
             renderAmmo(10, 10);

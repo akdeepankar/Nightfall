@@ -20,7 +20,6 @@ let ammo = 10;
 const MAX_AMMO = 10;
 let isReloading = false;
 let canFire = true;
-let gameWon = false;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §2  RENDERER & SCENE
@@ -48,21 +47,6 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// §2.5  MINI-MAP
-// ═══════════════════════════════════════════════════════════════════════════════
-const miniMapCanvas = document.getElementById("miniMap");
-const miniMapCtx = miniMapCanvas.getContext("2d");
-const MAP_SIZE = 120;
-const MAZE_SIZE = 40; // -20 to 20
-const MAP_SCALE = MAP_SIZE / MAZE_SIZE;
-const MAP_CENTER = MAP_SIZE / 2;
-
-// Hotspot position (exit)
-const HOTSPOT_X = 0;
-const HOTSPOT_Z = 0;
-const HOTSPOT_RADIUS = 0.5; // in world units
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §3  FPS CONTROLS  (inline pointer-lock — no external module)
@@ -247,39 +231,6 @@ addWall(-13, 3, 10, 1); // SW cross-piece
 addWall(5, 8, 10, 1); // SE passage blocker
 addWall(13, 13, 1, 10); // SE east pocket
 addWall(-3, -6, 6, 1); // west alcove stub
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// §6.5  MINI-MAP DRAWING
-// ═══════════════════════════════════════════════════════════════════════════════
-function drawMiniMap() {
-  miniMapCtx.clearRect(0, 0, MAP_SIZE, MAP_SIZE);
-
-  // Draw walls
-  miniMapCtx.fillStyle = "#666";
-  for (const wall of wallBoxes) {
-    const x = (wall.minX + 20) * MAP_SCALE;
-    const z = (wall.minZ + 20) * MAP_SCALE;
-    const w = (wall.maxX - wall.minX) * MAP_SCALE;
-    const h = (wall.maxZ - wall.minZ) * MAP_SCALE;
-    miniMapCtx.fillRect(x, z, w, h);
-  }
-
-  // Draw hotspot (exit)
-  const hx = (HOTSPOT_X + 20) * MAP_SCALE;
-  const hz = (HOTSPOT_Z + 20) * MAP_SCALE;
-  miniMapCtx.fillStyle = "#0f0";
-  miniMapCtx.beginPath();
-  miniMapCtx.arc(hx, hz, 6, 0, 2 * Math.PI);
-  miniMapCtx.fill();
-
-  // Draw player
-  const px = (yawObject.position.x + 20) * MAP_SCALE;
-  const pz = (yawObject.position.z + 20) * MAP_SCALE;
-  miniMapCtx.fillStyle = "#f00";
-  miniMapCtx.beginPath();
-  miniMapCtx.arc(px, pz, 3, 0, 2 * Math.PI);
-  miniMapCtx.fill();
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §7  COLLISION HELPER
@@ -762,7 +713,6 @@ const crosshairEl = document.getElementById("crosshair");
 const overlayEl = document.getElementById("overlay");
 const enterBtnEl = document.getElementById("enterBtn");
 const jumpscareEl = document.getElementById("jumpscare");
-const winScreenEl = document.getElementById("winScreen");
 
 let warningTimer = null;
 
@@ -1023,19 +973,6 @@ function triggerGameOver() {
   const el = document.getElementById("scareFinalScore");
   if (el) el.textContent = score;
   if (jumpscareEl) jumpscareEl.classList.add("visible");
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// §19.5  WIN CONDITION
-// ═══════════════════════════════════════════════════════════════════════════════
-function showWin() {
-  if (gameWon) return;
-  gameWon = true;
-  if (document.exitPointerLock) document.exitPointerLock();
-  isLocked = false;
-  const el = document.getElementById("winFinalScore");
-  if (el) el.textContent = score;
-  if (winScreenEl) winScreenEl.classList.add("visible");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1319,24 +1256,12 @@ function animate() {
         isMoving = false;
       }
 
-      // Check for win condition
-      const dx = yawObject.position.x - HOTSPOT_X;
-      const dz = yawObject.position.z - HOTSPOT_Z;
-      const dist = Math.sqrt(dx * dx + dz * dz);
-      if (dist < HOTSPOT_RADIUS && !gameWon) {
-        gameWon = true;
-        showWin();
-      }
-
       updateZombies(delta);
       applyCameraShake();
       flickerLightsUpdate();
       updateGunAnimation(delta);
     }
   }
-
-  // Draw mini-map
-  drawMiniMap();
 
   renderer.render(scene, camera);
 }
