@@ -160,21 +160,6 @@
                 box-shadow: none;
             }
 
-            #bar {
-                height: 8px;
-                background: #0f172a;
-                border: 1px solid #334463;
-                border-radius: 999px;
-                overflow: hidden;
-                margin-top: 6px;
-            }
-            #fill {
-                height: 100%;
-                width: 0%;
-                background: linear-gradient(90deg, #ef4444, #f59e0b, #fde047);
-                transition: width 0.08s linear;
-            }
-
             #main {
                 min-height: 0;
                 display: grid;
@@ -278,11 +263,6 @@
                     grid-template-rows: auto auto;
                 }
 
-                /* Hide shake meter card on very short screens */
-                #main .card:nth-child(2) {
-                    display: none;
-                }
-
                 #fire {
                     min-height: 120px;
                     font-size: clamp(22px, 8vw, 34px);
@@ -350,18 +330,20 @@
 
             <div class="card" id="triple">
                 <div>
-                    <div class="title">Motion</div>
-                    <div id="sensorSub" class="sub">Tap Enable</div>
+                    <div class="title">Controls</div>
+                    <div id="sensorSub" class="sub">Touch to Move</div>
                 </div>
                 <div>
-                    <span id="sensorDot" class="dot warn"></span>
+                    <span id="sensorDot" class="dot ok"></span>
                     <span
                         id="sensorTxt"
                         style="font-size: 11px; color: var(--muted)"
-                        >Off</span
+                        >Ready</span
                     >
                 </div>
-                <button id="enable">Enable Motion</button>
+                <div style="font-size: 10px; color: var(--muted); text-align: center;">
+                    Point anywhere on the pad below to move
+                </div>
             </div>
 
             <div id="main">
@@ -407,13 +389,7 @@
             const ctrlDot = el("ctrlDot");
             const ctrlTxt = el("ctrlTxt");
             const linkSub = el("linkSub");
-            const sensorDot = el("sensorDot");
-            const sensorTxt = el("sensorTxt");
-            const sensorSub = el("sensorSub");
             const host = el("host");
-            const fill = el("fill");
-            const pct = el("pct");
-            const sensorCounts = el("sensorCounts");
             const fire = el("fire");
             const toast = el("toast");
 
@@ -526,7 +502,7 @@
                 fx.classList.add("show");
             }
 
-            function fireNow(fromShake) {
+            function fireNow() {
                 if (cool) return;
                 cool = true;
                 setTimeout(() => (cool = false), 300);
@@ -538,16 +514,7 @@
                 setTimeout(() => (fire.style.transform = ""), 120);
 
                 if (navigator.vibrate) navigator.vibrate(20);
-
-                if (fromShake) {
-                    fire.textContent = "Fired";
-                    setTimeout(() => (fire.textContent = "Fire"), 320);
-                }
             }
-
-            let motionEventSeen = false;
-            let orientationEventSeen = false;
-            let enableCheckTimer = null;
 
             // ─── Movement Pad Variables ────────────────────────────────────────
             let movepadElement = null;
@@ -681,9 +648,6 @@
                 showToast("Reconnect requested");
             };
 
-            el("enable").onclick = async () => {
-                showToast("Movement pad ready!");
-            };
             el("start").onclick = () => {
                 send({ type: "start" });
                 showToast("Start Game sent");
@@ -700,13 +664,13 @@
                 "touchstart",
                 (e) => {
                     e.preventDefault();
-                    fireNow(false);
+                    fireNow();
                 },
                 { passive: false },
             );
             fire.addEventListener("mousedown", (e) => {
                 e.preventDefault();
-                fireNow(false);
+                fireNow();
             });
 
             renderAmmo(10, 10);
