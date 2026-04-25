@@ -101,10 +101,6 @@ function requestLock() {
 // ═══════════════════════════════════════════════════════════════════════════════
 const keys = { w: false, a: false, s: false, d: false };
 
-// Phone controller movement (from 360-degree pointing)
-let phoneMovementAngle = 0; // 0-360 degrees (0=right, 90=down, 180=left, 270=up)
-let phoneMovementMagnitude = 0; // 0-1 (0=no movement, 1=full speed)
-
 document.addEventListener("keydown", (e) => {
   if (e.code === "KeyW" || e.code === "ArrowUp") keys.w = true;
   if (e.code === "KeyA" || e.code === "ArrowLeft") keys.a = true;
@@ -764,7 +760,7 @@ function tickFootsteps(delta) {
 const MOVE_SPEED = 0.09;
 
 function processMovement() {
-  const moving = keys.w || keys.a || keys.s || keys.d || phoneMovementMagnitude > 0.05;
+  const moving = keys.w || keys.a || keys.s || keys.d;
   isMoving = moving;
   if (!moving) return;
 
@@ -776,8 +772,6 @@ function processMovement() {
 
   let dx = 0,
     dz = 0;
-  
-  // Keyboard input
   if (keys.w) {
     dx += fwdX * MOVE_SPEED;
     dz += fwdZ * MOVE_SPEED;
@@ -793,17 +787,6 @@ function processMovement() {
   if (keys.d) {
     dx += strX * MOVE_SPEED;
     dz += strZ * MOVE_SPEED;
-  }
-
-  // Phone controller pointing-based movement
-  if (phoneMovementMagnitude > 0.05) {
-    // Convert angle to radians (angle is 0=right, 90=down, 180=left, 270=up in game coords)
-    // In world coords: right=+X (sin), down=+Z (cos), left=-X, up=-Z
-    const angleRad = (phoneMovementAngle * Math.PI) / 180;
-    const moveX = Math.cos(angleRad) * phoneMovementMagnitude * MOVE_SPEED;
-    const moveZ = Math.sin(angleRad) * phoneMovementMagnitude * MOVE_SPEED;
-    dx += moveX;
-    dz += moveZ;
   }
 
   const cx = yawObject.position.x,
@@ -1153,15 +1136,17 @@ function connectToServer() {
     }
     if (msg.type === "fire") fireGun();
     if (msg.type === "reload") startReload();
-
-    // iPhone 360-degree pointing-based movement
     if (msg.type === "move") {
-      if (typeof msg.angle === "number" && Number.isFinite(msg.angle)) {
-        phoneMovementAngle = msg.angle % 360;
-      }
-      if (typeof msg.magnitude === "number" && Number.isFinite(msg.magnitude)) {
-        phoneMovementMagnitude = Math.max(0, Math.min(1, msg.magnitude));
-      }
+      if (msg.direction === "w") keys.w = true;
+      if (msg.direction === "a") keys.a = true;
+      if (msg.direction === "s") keys.s = true;
+      if (msg.direction === "d") keys.d = true;
+    }
+    if (msg.type === "stop") {
+      if (msg.direction === "w") keys.w = false;
+      if (msg.direction === "a") keys.a = false;
+      if (msg.direction === "s") keys.s = false;
+      if (msg.direction === "d") keys.d = false;
     }
 
     // iPhone camera-look stream (DeviceOrientation-derived deltas)
