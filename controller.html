@@ -586,7 +586,6 @@
             let lastOrientationAlpha = null;
             let lastOrientationBeta = null;
             let lastOrientationGamma = null;
-            let baselineAlpha = null;
 
             function onMotion(e) {
                 motionEventSeen = true;
@@ -665,21 +664,27 @@
                         orientationEventCount;
 
                 const alpha = e.alpha;
+                const beta = e.beta;
 
-                if (baselineAlpha === null) {
-                    baselineAlpha = alpha;
+                if (lastOrientationAlpha === null) {
+                    lastOrientationAlpha = alpha;
+                    lastOrientationBeta = beta;
+                    lastOrientationGamma = e.gamma;
                     return;
                 }
 
-                let relativeAlpha = alpha - baselineAlpha;
-                if (relativeAlpha > 180) relativeAlpha -= 360;
-                if (relativeAlpha < -180) relativeAlpha += 360;
+                let dAlpha = alpha - lastOrientationAlpha;
+                let dBeta = beta - lastOrientationBeta;
 
-                // Send absolute orientation for accurate, lag-free camera control
-                send({
-                    type: "orientation",
-                    yaw: relativeAlpha * (Math.PI / 180), // convert degrees to radians
-                });
+                if (dAlpha > 180) dAlpha -= 360;
+                if (dAlpha < -180) dAlpha += 360;
+
+                lastOrientationAlpha = alpha;
+                lastOrientationBeta = beta;
+                lastOrientationGamma = e.gamma;
+
+                // Use device orientation to drive camera yaw. Phone-right should move camera-right.
+                sendLook(dAlpha * 1.5, 0);
             }
 
             function finalizeSensorState(granted) {
@@ -843,7 +848,6 @@
                 lastOrientationAlpha = null;
                 lastOrientationBeta = null;
                 lastOrientationGamma = null;
-                baselineAlpha = null;
                 // Keep existing stream flags so UI remains accurate.
                 send({ type: "calibrate" }); // optional; desktop may ignore
                 showToast("Motion control reset");

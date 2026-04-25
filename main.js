@@ -1159,15 +1159,6 @@ function connectToServer() {
       phoneLookWeight = 1;
     }
 
-    // iPhone absolute orientation for accurate, lag-free camera control
-    if (msg.type === "orientation") {
-      if (typeof msg.yaw === "number" && Number.isFinite(msg.yaw)) {
-        yawObject.rotation.y = msg.yaw;
-      }
-      phoneLookLastTs = performance.now();
-      phoneLookWeight = 1;
-    }
-
     // Optional controller calibrate action: reset accumulated phone-look deltas.
     // This prevents stale orientation drift from carrying over after recalibration.
     if (msg.type === "calibrate") {
@@ -1229,6 +1220,9 @@ function animate() {
       -DEG85,
       Math.min(DEG85, pitchObject.rotation.x + lookDeltaPitchMouse),
     );
+
+    // Phone stream is additive on yaw only (sideways camera movement).
+    yawObject.rotation.y += lookDeltaYawPhone * phoneLookWeight;
 
     // consume frame deltas
     lookDeltaYawMouse = 0;
