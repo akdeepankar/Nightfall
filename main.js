@@ -32,8 +32,15 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0a0f);
-scene.fog = new THREE.FogExp2(0x0a0a0f, 0.022);
+scene.background = new THREE.Color(0x020513);
+scene.fog = new THREE.FogExp2(0x020513, 0.022);
+
+const starField = createStarField();
+scene.add(starField);
+
+const cometState = createComet();
+scene.add(cometState.group);
+scene.add(cometState.tailLine);
 
 const camera = new THREE.PerspectiveCamera(
   75,
@@ -47,6 +54,151 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+function createStarField() {
+  const stars = 1200;
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(stars * 3);
+  const colors = new Float32Array(stars * 3);
+
+  for (let i = 0; i < stars; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const radius = 65 + Math.random() * 40;
+    const x = Math.sin(phi) * Math.cos(theta) * radius;
+    const y = 18 + Math.random() * 50;
+    const z = Math.sin(phi) * Math.sin(theta) * radius;
+    const brightness = 0.6 + Math.random() * 0.4;
+
+    positions[i * 3 + 0] = x;
+    positions[i * 3 + 1] = y;
+    positions[i * 3 + 2] = z;
+    colors[i * 3 + 0] = brightness;
+    colors[i * 3 + 1] = brightness;
+    colors[i * 3 + 2] = brightness;
+  }
+
+  geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(positions, 3),
+  );
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+  const material = new THREE.PointsMaterial({
+    size: 1.4,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false,
+  });
+
+  return new THREE.Points(geometry, material);
+}
+
+function createComet() {
+  const group = new THREE.Group();
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.24, 10, 8),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffd3,
+      emissive: 0xffffd3,
+      transparent: true,
+      opacity: 1,
+    }),
+  );
+  group.add(head);
+
+  const tailLength = 16;
+  const tailPositions = new Float32Array(tailLength * 3);
+  const tailColors = new Float32Array(tailLength * 3);
+  for (let i = 0; i < tailLength; i++) {
+    const t = i / (tailLength - 1);
+    tailPositions[i * 3 + 0] = 0;
+    tailPositions[i * 3 + 1] = 0;
+    tailPositions[i * 3 + 2] = 0;
+    tailColors[i * 3 + 0] = 1;
+    tailColors[i * 3 + 1] = 0.9 - t * 0.7;
+    tailColors[i * 3 + 2] = 0.5 - t * 0.4;
+  }
+
+  const tailGeometry = new THREE.BufferGeometry();
+  tailGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(tailPositions, 3),
+  );
+  tailGeometry.setAttribute(
+    "color",
+    new THREE.BufferAttribute(tailColors, 3),
+  );
+
+  const tailLine = new THREE.Line(
+    tailGeometry,
+    new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+    }),
+  );
+
+  const state = {
+    group,
+    head,
+    tailLine,
+    tailHistory: [],
+    tailLength,
+    velocity: new THREE.Vector3(0.14, -0.046, 0.16),
+  };
+
+  resetComet(state);
+  return state;
+}
+
+function resetComet(state) {
+  const startX = -28 - Math.random() * 8;
+  const startY = 30 + Math.random() * 20;
+  const startZ = -50 - Math.random() * 16;
+  state.group.position.set(startX, startY, startZ);
+  state.tailHistory.length = 0;
+  for (let i = 0; i < state.tailLength; i++) {
+    state.tailHistory.push(state.group.position.clone());
+  }
+  updateCometTrail(state);
+}
+
+function updateCometTrail(state) {
+  const positions = state.tailLine.geometry.attributes.position.array;
+  for (let i = 0; i < state.tailLength; i++) {
+    const pos = state.tailHistory[i];
+    positions[i * 3 + 0] = pos.x;
+    positions[i * 3 + 1] = pos.y;
+    positions[i * 3 + 2] = pos.z;
+  }
+  state.tailLine.geometry.attributes.position.needsUpdate = true;
+}
+
+function updateComet(delta) {
+  const speedFactor = delta / 16.67;
+  const state = cometState;
+  const velocity = state.velocity.clone().multiplyScalar(speedFactor);
+  state.group.position.add(velocity);
+
+  state.tailHistory.unshift(state.group.position.clone());
+  if (state.tailHistory.length > state.tailLength) {
+    state.tailHistory.pop();
+  }
+
+  updateCometTrail(state);
+  state.group.lookAt(state.group.position.clone().sub(state.velocity));
+
+  if (
+    state.group.position.y < 10 ||
+    state.group.position.x > 42 ||
+    state.group.position.z > 40
+  ) {
+    resetComet(state);
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §3  FPS CONTROLS  (inline pointer-lock — no external module)
@@ -1255,6 +1407,8 @@ function animate() {
       flickerLightsUpdate();
       updateGunAnimation(delta);
     }
+
+    updateComet(delta);
   }
 
   renderer.render(scene, camera);
