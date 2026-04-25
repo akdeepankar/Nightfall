@@ -683,8 +683,8 @@
                 lastOrientationBeta = beta;
                 lastOrientationGamma = e.gamma;
 
-                // Use device orientation to drive camera yaw. Pitch is ignored on the game side.
-                sendLook(-dAlpha * 0.3, 0);
+                // Use device orientation to drive camera yaw. Phone-right should move camera-right.
+                sendLook(dAlpha * 0.8, 0);
             }
 
             function finalizeSensorState(granted) {
