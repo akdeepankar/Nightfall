@@ -1225,14 +1225,6 @@ function updateZombies(delta) {
       zomb.mesh.position.y = Math.abs(Math.sin(zomb.walkTimer * 0.5)) * 0.03;
     }
   }
-
-  // ── Periodic new-zombie spawn ─────────────────────────────────────────────
-  zombieSpawnTimer += delta;
-  if (zombieSpawnTimer >= SPAWN_INTERVAL_MS) {
-    zombieSpawnTimer = 0;
-    const pt = SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)];
-    spawnZombie(pt[0], pt[1]);
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1690,7 +1682,6 @@ function startGame() {
   // Second call (controller Start command) begins enemies.
   if (gameStarted) return;
   gameStarted = true;
-  spawnInitialWave();
   spawnGhost();
   showWarning("Be quiet... something is sleeping in the dark.");
 }
