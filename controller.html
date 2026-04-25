@@ -468,7 +468,6 @@
             let retry = null;
             let retries = 0;
 
-            let cool = false;
             let lastSend = 0;
             let lastShake = 0,
                 ax = 0,
@@ -481,6 +480,7 @@
 
             let motionEventCount = 0;
             let orientationEventCount = 0;
+            let lastSendOrientation = 0;
 
             const SHAKE = 8.5;
             const SHAKECD = 260;
@@ -695,10 +695,15 @@
 
                 const alpha = e.alpha;
 
-                if (baselineAlpha === null) {
-                    baselineAlpha = alpha;
-                    return;
-                }
+                lastOrientationAlpha = alpha;
+                lastOrientationBeta = e.beta;
+                lastOrientationGamma = e.gamma;
+
+                if (baselineAlpha === null) return;
+
+                const now = performance.now();
+                if (now - lastSendOrientation < LOOKMS) return;
+                lastSendOrientation = now;
 
                 let relativeAlpha = alpha - baselineAlpha;
                 if (relativeAlpha > 180) relativeAlpha -= 360;
@@ -869,10 +874,7 @@
                 ax = 0;
                 ay = 0;
                 az = 0;
-                lastOrientationAlpha = null;
-                lastOrientationBeta = null;
-                lastOrientationGamma = null;
-                baselineAlpha = null;
+                baselineAlpha = lastOrientationAlpha;
                 // Keep existing stream flags so UI remains accurate.
                 send({ type: "calibrate" }); // optional; desktop may ignore
                 showToast("Motion control reset");
