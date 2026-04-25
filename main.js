@@ -33,7 +33,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x020513);
-scene.fog = new THREE.FogExp2(0x020513, 0.022);
+scene.fog = new THREE.FogExp2(0x020513, 0.025);
 
 const starField = createStarField();
 scene.add(starField);
@@ -251,13 +251,14 @@ function requestLock() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // §4  INPUT
 // ═══════════════════════════════════════════════════════════════════════════════
-const keys = { w: false, a: false, s: false, d: false };
+const keys = { w: false, a: false, s: false, d: false, shift: false };
 
 document.addEventListener("keydown", (e) => {
   if (e.code === "KeyW" || e.code === "ArrowUp") keys.w = true;
   if (e.code === "KeyA" || e.code === "ArrowLeft") keys.a = true;
   if (e.code === "KeyS" || e.code === "ArrowDown") keys.s = true;
   if (e.code === "KeyD" || e.code === "ArrowRight") keys.d = true;
+  if (e.code === "ShiftLeft" || e.code === "ShiftRight") keys.shift = true;
   // R = reload (only when not already reloading and magazine not full)
   if (
     e.code === "KeyR" &&
@@ -274,6 +275,7 @@ document.addEventListener("keyup", (e) => {
   if (e.code === "KeyA" || e.code === "ArrowLeft") keys.a = false;
   if (e.code === "KeyS" || e.code === "ArrowDown") keys.s = false;
   if (e.code === "KeyD" || e.code === "ArrowRight") keys.d = false;
+  if (e.code === "ShiftLeft" || e.code === "ShiftRight") keys.shift = false;
 });
 
 // Left mouse button → fire
@@ -282,26 +284,48 @@ document.addEventListener("mousedown", (e) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// §5  LIGHTING
+// §5  LIGHTING  — DARK ROOM + TORCH VIEW
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Ambient — dim blue-gray so walls are always readable
-scene.add(new THREE.AmbientLight(0x303040, 2.5));
+// Near-zero ambient — the room is almost pitch black
+scene.add(new THREE.AmbientLight(0x080810, 0.15));
 
-// Player lantern — warm light that follows the camera
-const lantern = new THREE.PointLight(0xffd580, 2.2, 12);
+// ── TORCH / FLASHLIGHT ──────────────────────────────────────────────────────
+// SpotLight creates the classic flashlight cone
+const torch = new THREE.SpotLight(0xffe0a0, 3.5, 18, Math.PI / 6, 0.45, 1.6);
+torch.position.set(0, -0.1, -0.3);
+torch.castShadow = true;
+torch.shadow.mapSize.set(1024, 1024);
+torch.shadow.camera.near = 0.1;
+torch.shadow.camera.far = 18;
+torch.shadow.bias = -0.002;
+
+// Torch target — aim forward into the scene
+const torchTarget = new THREE.Object3D();
+torchTarget.position.set(0, -0.05, -5);
+pitchObject.add(torchTarget);
+torch.target = torchTarget;
+pitchObject.add(torch);
+
+// Close-range fill light so the gun/walls nearby aren't completely invisible
+const lantern = new THREE.PointLight(0xffd580, 0.4, 4);
 lantern.position.set(0, -0.15, -0.4);
 pitchObject.add(lantern);
 
-// Static scene lights: eerie red/orange deep in the maze
+// Torch flicker state
+const TORCH_BASE_INTENSITY = 3.5;
+const TORCH_BASE_ANGLE = Math.PI / 6;
+let torchFlickerSeed = 0;
+
+// Static scene lights: reduced to barely-visible ember glows in the darkness
 const staticLightDefs = [
-  { color: 0xff2200, intensity: 3.5, range: 20, x: -8, z: -8, shadow: true },
-  { color: 0xff6600, intensity: 3.0, range: 18, x: 10, z: 8, shadow: true },
-  { color: 0xff4400, intensity: 1.8, range: 10, x: -5, z: 5, shadow: false },
-  { color: 0xff4400, intensity: 1.8, range: 10, x: 7, z: -5, shadow: false },
-  { color: 0xff4400, intensity: 1.8, range: 10, x: -12, z: 2, shadow: false },
-  { color: 0xff4400, intensity: 1.8, range: 10, x: 3, z: 12, shadow: false },
-  { color: 0xff4400, intensity: 1.8, range: 10, x: -3, z: -13, shadow: false },
+  { color: 0xff2200, intensity: 0.25, range: 6, x: -8, z: -8, shadow: false },
+  { color: 0xff6600, intensity: 0.20, range: 5, x: 10, z: 8, shadow: false },
+  { color: 0xff4400, intensity: 0.12, range: 4, x: -5, z: 5, shadow: false },
+  { color: 0xff4400, intensity: 0.12, range: 4, x: 7, z: -5, shadow: false },
+  { color: 0xff4400, intensity: 0.12, range: 4, x: -12, z: 2, shadow: false },
+  { color: 0xff4400, intensity: 0.12, range: 4, x: 3, z: 12, shadow: false },
+  { color: 0xff4400, intensity: 0.12, range: 4, x: -3, z: -13, shadow: false },
 ];
 
 const flickerLights = [];
@@ -330,15 +354,15 @@ pitchObject.add(muzzleLight);
 const wallBoxes = []; // flat AABB footprints used for all collision tests
 
 const wallMat = new THREE.MeshStandardMaterial({
-  color: 0x4a4a5a,
+  color: 0x2a2a32,
   roughness: 1.0,
 });
 const floorMat = new THREE.MeshStandardMaterial({
-  color: 0x2a2a35,
+  color: 0x1a1a22,
   roughness: 1.0,
 });
 const ceilMat = new THREE.MeshStandardMaterial({
-  color: 0x1a1a22,
+  color: 0x0e0e14,
   roughness: 1.0,
 });
 
@@ -576,15 +600,24 @@ function playJumpscare() {
 function buildGunMesh() {
   const g = new THREE.Group();
   const metal = new THREE.MeshStandardMaterial({
-    color: 0x1c1c1c,
+    color: 0x3a3a44,
     roughness: 0.25,
     metalness: 0.9,
+    emissive: 0x1a1a22,
+    emissiveIntensity: 0.8,
   });
   const grip = new THREE.MeshStandardMaterial({
-    color: 0x2e1a0a,
+    color: 0x4a2a12,
     roughness: 0.95,
     metalness: 0.0,
+    emissive: 0x1a0e04,
+    emissiveIntensity: 0.7,
   });
+
+  // Dedicated gun illumination light — ensures the weapon is always visible
+  const gunLight = new THREE.PointLight(0xffeedd, 0.6, 1.2);
+  gunLight.position.set(0, 0.0, -0.15);
+  g.add(gunLight);
 
   // Slide — upper receiver
   const slide = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.068, 0.3), metal);
@@ -829,11 +862,29 @@ function fireGun() {
     });
   });
 
-  const hits = raycaster.intersectObjects(targets.map((t) => t.mesh));
-  if (hits.length > 0) {
-    const entry = targets.find((t) => t.mesh === hits[0].object);
-    if (entry) hitZombie(entry.zombie);
+  // Also collect ghost meshes for shooting
+  const ghostTargets = [];
+  if (ghost && ghost.state === 'hunting') {
+    ghost.mesh.traverse((child) => {
+      if (child.isMesh) ghostTargets.push(child);
+    });
   }
+
+  const allShootable = [...targets.map((t) => t.mesh), ...ghostTargets];
+  const hits = raycaster.intersectObjects(allShootable);
+  if (hits.length > 0) {
+    const hitObj = hits[0].object;
+    // Check zombies first
+    const entry = targets.find((t) => t.mesh === hitObj);
+    if (entry) {
+      hitZombie(entry.zombie);
+    } else if (ghostTargets.includes(hitObj)) {
+      hitGhost();
+    }
+  }
+
+  // Gunshot also spikes noise
+  noiseLevel = Math.min(1, noiseLevel + 0.3);
 
   // Auto-reload on empty
   if (ammo === 0) startReload();
@@ -888,21 +939,92 @@ function updateHUD() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// §13  FOOTSTEP SYSTEM
+// §13  FOOTSTEP SYSTEM + NOISE LEVEL
 // ═══════════════════════════════════════════════════════════════════════════════
 let isMoving = false;
+let isSprinting = false;
 let footstepTimer = 0;
-const FOOTSTEP_INTERVAL = 400; // ms
+const FOOTSTEP_INTERVAL_WALK = 400; // ms
+const FOOTSTEP_INTERVAL_SPRINT = 220; // ms — faster steps when sprinting
+
+// Noise level: 0 = silent, 1 = max noise
+let noiseLevel = 0;
+let displayedNoiseLevel = 0; // smoothed for display
+const NOISE_WALK = 0.35;
+const NOISE_SPRINT = 0.85;
+const NOISE_DECAY_RATE = 2.5; // per second — how fast noise fades when still
+const NOISE_RISE_RATE = 4.0;  // per second — how fast noise rises
+
+const noiseMeterEl = document.getElementById("noiseMeter");
+const noiseFillEl = document.getElementById("noiseFill");
+const noiseLabelEl = document.getElementById("noiseLabel");
+const noiseIconEl = document.getElementById("noiseIcon");
 
 function tickFootsteps(delta) {
+  const dt = delta / 1000; // seconds
+
   if (!isMoving) {
     footstepTimer = 0;
-    return;
+    // Decay noise level when standing still
+    noiseLevel = Math.max(0, noiseLevel - NOISE_DECAY_RATE * dt);
+  } else {
+    const targetNoise = isSprinting ? NOISE_SPRINT : NOISE_WALK;
+    // Rise toward target noise
+    if (noiseLevel < targetNoise) {
+      noiseLevel = Math.min(targetNoise, noiseLevel + NOISE_RISE_RATE * dt);
+    } else {
+      noiseLevel = Math.max(targetNoise, noiseLevel - NOISE_DECAY_RATE * dt);
+    }
+
+    const interval = isSprinting ? FOOTSTEP_INTERVAL_SPRINT : FOOTSTEP_INTERVAL_WALK;
+    footstepTimer += delta;
+    if (footstepTimer >= interval) {
+      footstepTimer -= interval;
+      playFootstepSound();
+    }
   }
-  footstepTimer += delta;
-  if (footstepTimer >= FOOTSTEP_INTERVAL) {
-    footstepTimer -= FOOTSTEP_INTERVAL;
-    playFootstepSound();
+
+  // Smooth the displayed value
+  displayedNoiseLevel += (noiseLevel - displayedNoiseLevel) * Math.min(1, dt * 8);
+
+  updateNoiseMeter();
+}
+
+function updateNoiseMeter() {
+  if (!noiseFillEl || !noiseLabelEl) return;
+
+  const pct = Math.round(displayedNoiseLevel * 100);
+  noiseFillEl.style.width = pct + "%";
+
+  // Color: green → yellow → orange → red based on level
+  let color, label;
+  if (displayedNoiseLevel < 0.01) {
+    color = "#2a6e2a";
+    label = "SILENT";
+  } else if (displayedNoiseLevel < 0.25) {
+    color = "#4a9e3a";
+    label = "QUIET";
+  } else if (displayedNoiseLevel < 0.5) {
+    color = "#c8b800";
+    label = "MODERATE";
+  } else if (displayedNoiseLevel < 0.7) {
+    color = "#e08a00";
+    label = "LOUD";
+  } else {
+    color = "#dd2a00";
+    label = "DANGER";
+  }
+
+  noiseFillEl.style.background = color;
+  noiseFillEl.style.boxShadow = `0 0 8px ${color}, 0 0 2px ${color}`;
+  noiseLabelEl.textContent = label;
+  noiseLabelEl.style.color = color;
+
+  // Pulse the icon when loud
+  if (noiseIconEl) {
+    noiseIconEl.style.opacity = displayedNoiseLevel < 0.01 ? "0.3" : "1";
+    noiseIconEl.style.filter = displayedNoiseLevel > 0.6
+      ? `drop-shadow(0 0 4px ${color})` : "none";
   }
 }
 
@@ -910,11 +1032,15 @@ function tickFootsteps(delta) {
 // §14  PLAYER MOVEMENT + COLLISION
 // ═══════════════════════════════════════════════════════════════════════════════
 const MOVE_SPEED = 0.09;
+const SPRINT_MULTIPLIER = 1.8;
 
 function processMovement() {
   const moving = keys.w || keys.a || keys.s || keys.d;
   isMoving = moving;
+  isSprinting = moving && keys.shift;
   if (!moving) return;
+
+  const speed = isSprinting ? MOVE_SPEED * SPRINT_MULTIPLIER : MOVE_SPEED;
 
   const yaw = yawObject.rotation.y;
   const fwdX = -Math.sin(yaw),
@@ -925,33 +1051,85 @@ function processMovement() {
   let dx = 0,
     dz = 0;
   if (keys.w) {
-    dx += fwdX * MOVE_SPEED;
-    dz += fwdZ * MOVE_SPEED;
+    dx += fwdX * speed;
+    dz += fwdZ * speed;
   }
   if (keys.s) {
-    dx -= fwdX * MOVE_SPEED;
-    dz -= fwdZ * MOVE_SPEED;
+    dx -= fwdX * speed;
+    dz -= fwdZ * speed;
   }
   if (keys.a) {
-    dx -= strX * MOVE_SPEED;
-    dz -= strZ * MOVE_SPEED;
+    dx -= strX * speed;
+    dz -= strZ * speed;
   }
   if (keys.d) {
-    dx += strX * MOVE_SPEED;
-    dz += strZ * MOVE_SPEED;
+    dx += strX * speed;
+    dz += strZ * speed;
   }
 
   const cx = yawObject.position.x,
     cz = yawObject.position.z;
   // Per-axis collision so player slides along walls instead of stopping dead
-  if (!collidesWithWalls(cx + dx, cz + dz)) {
+  const fullBlocked = collidesWithWalls(cx + dx, cz + dz);
+  const xBlocked = collidesWithWalls(cx + dx, cz);
+  const zBlocked = collidesWithWalls(cx, cz + dz);
+
+  if (!fullBlocked) {
     yawObject.position.x += dx;
     yawObject.position.z += dz;
-  } else if (!collidesWithWalls(cx + dx, cz)) {
+  } else if (!xBlocked) {
     yawObject.position.x += dx;
-  } else if (!collidesWithWalls(cx, cz + dz)) {
+    // Sliding along wall — partial collision noise
+    wallSlamNoise(0.4);
+  } else if (!zBlocked) {
     yawObject.position.z += dz;
+    // Sliding along wall — partial collision noise
+    wallSlamNoise(0.4);
+  } else {
+    // Fully blocked — slamming directly into wall
+    wallSlamNoise(1.0);
   }
+}
+
+// Wall slam noise burst — scales with impact severity and sprint state
+const WALL_SLAM_COOLDOWN = 250; // ms between slam sounds
+let lastWallSlamTime = 0;
+
+function wallSlamNoise(severity) {
+  const slamNoise = isSprinting ? 0.5 * severity : 0.3 * severity;
+  noiseLevel = Math.min(1, noiseLevel + slamNoise);
+
+  const now = performance.now();
+  if (now - lastWallSlamTime > WALL_SLAM_COOLDOWN) {
+    lastWallSlamTime = now;
+    playWallSlam(severity);
+  }
+}
+
+// Deep thud sound for wall impact
+function playWallSlam(severity) {
+  const ctx = getAudioContext(), SR = ctx.sampleRate;
+  const duration = 0.12 + severity * 0.06;
+  const buf = ctx.createBuffer(1, Math.floor(SR * duration), SR);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (SR * 0.025));
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const filt = ctx.createBiquadFilter();
+  filt.type = "lowpass";
+  filt.frequency.value = 150 + severity * 80;
+  filt.Q.value = 1.0;
+  const gain = ctx.createGain(), now = ctx.currentTime;
+  const vol = isSprinting ? 0.5 * severity : 0.3 * severity;
+  gain.gain.setValueAtTime(vol, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  src.connect(filt);
+  filt.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(now);
+  src.stop(now + duration + 0.01);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1075,15 +1253,30 @@ function applyCameraShake() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// §17  LIGHT FLICKER
+// §17  LIGHT FLICKER + TORCH FLICKER
 // ═══════════════════════════════════════════════════════════════════════════════
-function flickerLightsUpdate() {
+function flickerLightsUpdate(delta) {
+  // Static ember lights — subtle random flicker
   flickerLights.forEach((light, i) => {
     light.intensity = Math.max(
       0,
-      flickerBaseIntensity[i] + (Math.random() * 2 - 1) * 0.08,
+      flickerBaseIntensity[i] + (Math.random() * 2 - 1) * 0.04,
     );
   });
+
+  // Torch flicker — organic, fire-like intensity variation
+  torchFlickerSeed += (delta || 16) * 0.008;
+  const flicker1 = Math.sin(torchFlickerSeed * 3.7) * 0.15;
+  const flicker2 = Math.sin(torchFlickerSeed * 7.3 + 1.2) * 0.08;
+  const flicker3 = Math.sin(torchFlickerSeed * 13.1 + 4.5) * 0.05;
+  const randomJitter = (Math.random() - 0.5) * 0.12;
+  torch.intensity = TORCH_BASE_INTENSITY + flicker1 + flicker2 + flicker3 + randomJitter;
+
+  // Slight angle wobble for realism
+  torch.angle = TORCH_BASE_ANGLE + Math.sin(torchFlickerSeed * 2.1) * 0.015;
+
+  // Lantern (close fill) also flickers slightly
+  lantern.intensity = 0.4 + (Math.random() - 0.5) * 0.06;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1114,7 +1307,338 @@ function updateGunAnimation(delta) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// §19  GAME OVER
+// §19  GHOST SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════════
+const GHOST_HP = 2;
+const GHOST_SPEED = 0.022;
+const GHOST_ATTACK_DIST = 1.3;
+const GHOST_WANDER_SPEED = 0.012;
+
+let ghost = null; // { mesh, hp, state, wanderAngle, wanderTimer, groanTimer, bobTimer, flashTimer }
+
+function buildGhostMesh() {
+  const g = new THREE.Group();
+
+  // Ghostly translucent material
+  const ghostMat = new THREE.MeshStandardMaterial({
+    color: 0x99bbcc,
+    roughness: 0.3,
+    metalness: 0.1,
+    emissive: 0x334455,
+    emissiveIntensity: 0.6,
+    transparent: true,
+    opacity: 0.55,
+  });
+  const eyeMat = new THREE.MeshBasicMaterial({
+    color: 0x00ffcc,
+    transparent: true,
+    opacity: 0.9,
+  });
+
+  // Hooded head / skull
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), ghostMat);
+  head.position.y = 1.7;
+  head.scale.set(1, 1.15, 1);
+  g.add(head);
+
+  // Eyes — eerie green glow
+  [-0.1, 0.1].forEach((ex) => {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), eyeMat);
+    eye.position.set(ex, 1.72, 0.26);
+    g.add(eye);
+  });
+
+  // Torso — wispy draped shape
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.45, 1.0, 8), ghostMat);
+  torso.position.y = 1.1;
+  g.add(torso);
+
+  // Lower body — fading tail
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.8, 8), ghostMat.clone());
+  tail.material.opacity = 0.3;
+  tail.position.y = 0.3;
+  tail.rotation.x = Math.PI; // point down
+  g.add(tail);
+
+  // Ghost glow light
+  const ghostLight = new THREE.PointLight(0x33ffaa, 0, 6);
+  ghostLight.position.set(0, 1.4, 0);
+  g.add(ghostLight);
+
+  g.userData.ghostMat = ghostMat;
+  g.userData.eyeMat = eyeMat;
+  g.userData.ghostLight = ghostLight;
+
+  return g;
+}
+
+function spawnGhost() {
+  if (ghost) return;
+  const mesh = buildGhostMesh();
+  // Spawn far from player, in a corner
+  mesh.position.set(-15, 0, 15);
+  scene.add(mesh);
+
+  ghost = {
+    mesh,
+    hp: GHOST_HP,
+    state: 'sleeping', // sleeping → hunting → dying → dead
+    wanderAngle: Math.random() * Math.PI * 2,
+    wanderTimer: 0,
+    groanTimer: 2000,
+    bobTimer: 0,
+    flashTimer: 0,
+    deathTimer: 0,
+  };
+
+  // Sleeping: eyes dimmed, no glow
+  mesh.userData.eyeMat.opacity = 0.2;
+  mesh.userData.ghostLight.intensity = 0;
+  mesh.userData.ghostMat.opacity = 0.25;
+}
+
+function wakeGhost() {
+  if (!ghost || ghost.state !== 'sleeping') return;
+  ghost.state = 'hunting';
+  ghost.mesh.userData.eyeMat.opacity = 0.9;
+  ghost.mesh.userData.ghostLight.intensity = 1.5;
+  ghost.mesh.userData.ghostMat.opacity = 0.55;
+
+  // Dramatic full-screen wake alert
+  const wakeOverlay = document.getElementById('ghostWake');
+  if (wakeOverlay) {
+    wakeOverlay.classList.add('visible');
+    setTimeout(() => wakeOverlay.classList.remove('visible'), 3500);
+  }
+
+  // Violent torch flicker for 1 second
+  const origIntensity = torch.intensity;
+  let flickerCount = 0;
+  const flickerInterval = setInterval(() => {
+    torch.intensity = Math.random() < 0.5 ? 0 : TORCH_BASE_INTENSITY * 1.5;
+    flickerCount++;
+    if (flickerCount > 15) {
+      clearInterval(flickerInterval);
+      torch.intensity = origIntensity;
+    }
+  }, 70);
+
+  playGhostWake();
+}
+
+function hitGhost() {
+  if (!ghost || ghost.state === 'dying' || ghost.state === 'dead') return;
+  ghost.hp--;
+  ghost.flashTimer = 120;
+
+  // Flash white on hit
+  const mat = ghost.mesh.userData.ghostMat;
+  const origColor = mat.emissive.getHex();
+  mat.emissive.set(0xffffff);
+  mat.emissiveIntensity = 2.0;
+  setTimeout(() => {
+    mat.emissive.setHex(origColor);
+    mat.emissiveIntensity = 0.6;
+  }, 100);
+
+  if (ghost.hp <= 0) {
+    ghost.state = 'dying';
+    ghost.deathTimer = 1200;
+    playGhostDeath();
+  }
+}
+
+function updateGhost(delta) {
+  if (!ghost || ghost.state === 'dead') return;
+
+  const px = yawObject.position.x;
+  const pz = yawObject.position.z;
+  const gx = ghost.mesh.position.x;
+  const gz = ghost.mesh.position.z;
+  const ddx = px - gx;
+  const ddz = pz - gz;
+  const dist = Math.sqrt(ddx * ddx + ddz * ddz);
+
+  // Bobbing float animation
+  ghost.bobTimer += delta * 0.003;
+  const floatY = 0.15 + Math.sin(ghost.bobTimer) * 0.12;
+  ghost.mesh.position.y = floatY;
+
+  // --- DYING: fade out and shrink ---
+  if (ghost.state === 'dying') {
+    ghost.deathTimer -= delta;
+    const t = Math.max(0, ghost.deathTimer / 1200);
+    ghost.mesh.userData.ghostMat.opacity = 0.55 * t;
+    ghost.mesh.userData.eyeMat.opacity = 0.9 * t;
+    ghost.mesh.userData.ghostLight.intensity = 1.5 * t;
+    ghost.mesh.scale.set(1 + (1 - t) * 0.3, t, 1 + (1 - t) * 0.3);
+    if (ghost.deathTimer <= 0) {
+      ghost.state = 'dead';
+      scene.remove(ghost.mesh);
+      triggerVictory();
+    }
+    return;
+  }
+
+  // --- SLEEPING: check if noise level hits danger ---
+  if (ghost.state === 'sleeping') {
+    if (noiseLevel >= 0.7) {
+      wakeGhost();
+    }
+    return;
+  }
+
+  // --- HUNTING ---
+  // Contact → game over
+  if (dist < GHOST_ATTACK_DIST) {
+    triggerGameOver();
+    return;
+  }
+
+  // Proximity-based ghost sound
+  ghost.groanTimer -= delta;
+  if (ghost.groanTimer <= 0) {
+    const volume = Math.max(0.05, Math.min(1, (15 - dist) / 15));
+    playGhostGroan(volume);
+    // Closer = more frequent groans
+    ghost.groanTimer = dist < 5 ? 800 + Math.random() * 1200 : 2000 + Math.random() * 3000;
+  }
+
+  // Ghost light pulses with proximity
+  ghost.mesh.userData.ghostLight.intensity = 0.5 + Math.max(0, (12 - dist) / 12) * 2.0;
+
+  // Movement: chase player with wall avoidance
+  const spd = GHOST_SPEED * (delta / 16.67);
+  const nx = (ddx / dist) * spd;
+  const nz = (ddz / dist) * spd;
+
+  if (!collidesWithWalls(gx + nx, gz + nz, 0.35)) {
+    ghost.mesh.position.x += nx;
+    ghost.mesh.position.z += nz;
+  } else if (!collidesWithWalls(gx + nx, gz, 0.35)) {
+    ghost.mesh.position.x += nx;
+  } else if (!collidesWithWalls(gx, gz + nz, 0.35)) {
+    ghost.mesh.position.z += nz;
+  } else {
+    // Try to go around
+    ghost.wanderTimer -= delta;
+    if (ghost.wanderTimer <= 0) {
+      ghost.wanderAngle = Math.atan2(ddx, ddz) + (Math.random() - 0.5) * 2;
+      ghost.wanderTimer = 500;
+    }
+    const wx = Math.sin(ghost.wanderAngle) * spd;
+    const wz = Math.cos(ghost.wanderAngle) * spd;
+    if (!collidesWithWalls(gx + wx, gz + wz, 0.35)) {
+      ghost.mesh.position.x += wx;
+      ghost.mesh.position.z += wz;
+    }
+  }
+
+  // Face the player
+  ghost.mesh.rotation.y = Math.atan2(ddx, ddz);
+}
+
+// --- Ghost sounds ---
+function playGhostGroan(volume) {
+  const ctx = getAudioContext();
+  const osc = ctx.createOscillator();
+  const osc2 = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const now = ctx.currentTime;
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(90 + Math.random() * 30, now);
+  osc.frequency.linearRampToValueAtTime(60 + Math.random() * 20, now + 0.8);
+
+  osc2.type = 'sine';
+  osc2.frequency.setValueAtTime(93 + Math.random() * 10, now);
+  osc2.frequency.linearRampToValueAtTime(58, now + 0.8);
+
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(volume * 0.15, now + 0.15);
+  gain.gain.linearRampToValueAtTime(0, now + 0.8);
+
+  osc.connect(gain);
+  osc2.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc2.start(now);
+  osc.stop(now + 0.85);
+  osc2.stop(now + 0.85);
+}
+
+function playGhostWake() {
+  const ctx = getAudioContext();
+  const now = ctx.currentTime;
+
+  // Layer 1: Rising screech
+  const osc1 = ctx.createOscillator();
+  const gain1 = ctx.createGain();
+  osc1.type = 'sawtooth';
+  osc1.frequency.setValueAtTime(60, now);
+  osc1.frequency.exponentialRampToValueAtTime(800, now + 0.8);
+  osc1.frequency.exponentialRampToValueAtTime(150, now + 2.0);
+  gain1.gain.setValueAtTime(0.4, now);
+  gain1.gain.linearRampToValueAtTime(0.5, now + 0.4);
+  gain1.gain.linearRampToValueAtTime(0, now + 2.0);
+  osc1.connect(gain1);
+  gain1.connect(ctx.destination);
+  osc1.start(now);
+  osc1.stop(now + 2.1);
+
+  // Layer 2: White noise burst (breath/wind)
+  const SR = ctx.sampleRate;
+  const noiseBuf = ctx.createBuffer(1, Math.floor(SR * 1.5), SR);
+  const noiseData = noiseBuf.getChannelData(0);
+  for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
+  const noiseSrc = ctx.createBufferSource();
+  noiseSrc.buffer = noiseBuf;
+  const noiseFilt = ctx.createBiquadFilter();
+  noiseFilt.type = 'bandpass';
+  noiseFilt.frequency.value = 400;
+  noiseFilt.Q.value = 2;
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0, now);
+  noiseGain.gain.linearRampToValueAtTime(0.6, now + 0.2);
+  noiseGain.gain.linearRampToValueAtTime(0, now + 1.5);
+  noiseSrc.connect(noiseFilt);
+  noiseFilt.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
+  noiseSrc.start(now);
+  noiseSrc.stop(now + 1.6);
+
+  // Layer 3: Deep sub-bass rumble
+  const osc2 = ctx.createOscillator();
+  const gain2 = ctx.createGain();
+  osc2.type = 'sine';
+  osc2.frequency.setValueAtTime(30, now);
+  osc2.frequency.linearRampToValueAtTime(45, now + 1.0);
+  gain2.gain.setValueAtTime(0.3, now);
+  gain2.gain.linearRampToValueAtTime(0, now + 2.0);
+  osc2.connect(gain2);
+  gain2.connect(ctx.destination);
+  osc2.start(now);
+  osc2.stop(now + 2.1);
+}
+
+function playGhostDeath() {
+  const ctx = getAudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const now = ctx.currentTime;
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(400, now);
+  osc.frequency.exponentialRampToValueAtTime(20, now + 1.5);
+  gain.gain.setValueAtTime(0.4, now);
+  gain.gain.linearRampToValueAtTime(0, now + 1.5);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 1.6);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// §19b  GAME OVER / VICTORY
 // ═══════════════════════════════════════════════════════════════════════════════
 function triggerGameOver() {
   if (gameOver) return;
@@ -1125,6 +1649,18 @@ function triggerGameOver() {
   const el = document.getElementById("scareFinalScore");
   if (el) el.textContent = score;
   if (jumpscareEl) jumpscareEl.classList.add("visible");
+}
+
+function triggerVictory() {
+  if (gameOver) return;
+  gameOver = true;
+  if (document.exitPointerLock) document.exitPointerLock();
+  isLocked = false;
+
+  const victoryEl = document.getElementById("victory");
+  const victoryScoreEl = document.getElementById("victoryScore");
+  if (victoryScoreEl) victoryScoreEl.textContent = score;
+  if (victoryEl) victoryEl.classList.add("visible");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1143,6 +1679,7 @@ function startGame() {
     if (hudEl) hudEl.classList.add("active");
     if (ammoHudEl) ammoHudEl.classList.add("active");
     if (crosshairEl) crosshairEl.classList.add("active");
+    if (noiseMeterEl) noiseMeterEl.classList.add("active");
 
     updateHUD();
     requestLock();
@@ -1154,7 +1691,8 @@ function startGame() {
   if (gameStarted) return;
   gameStarted = true;
   spawnInitialWave();
-  showWarning("Game started. Enemies are coming...");
+  spawnGhost();
+  showWarning("Be quiet... something is sleeping in the dark.");
 }
 
 if (enterBtnEl) enterBtnEl.addEventListener("click", startGame);
@@ -1389,7 +1927,7 @@ function animate() {
       } else {
         isMoving = false;
       }
-      flickerLightsUpdate();
+      flickerLightsUpdate(delta);
       updateGunAnimation(delta);
     }
 
@@ -1403,8 +1941,9 @@ function animate() {
       }
 
       updateZombies(delta);
+      updateGhost(delta);
       applyCameraShake();
-      flickerLightsUpdate();
+      flickerLightsUpdate(delta);
       updateGunAnimation(delta);
     }
 

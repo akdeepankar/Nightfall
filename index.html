@@ -285,6 +285,143 @@
             }
 
             /* ─────────────────────────────────────────
+         VICTORY OVERLAY
+      ───────────────────────────────────────── */
+            #victory {
+                position: fixed;
+                inset: 0;
+                z-index: 100;
+                display: none;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 20px;
+                background: radial-gradient(
+                    ellipse at center,
+                    rgba(0, 50, 30, 0.85) 0%,
+                    rgba(0, 20, 15, 0.95) 50%,
+                    #000 100%
+                );
+                pointer-events: all;
+                box-shadow: inset 0 0 120px rgba(0, 180, 100, 0.3);
+            }
+
+            #victory.visible {
+                display: flex;
+            }
+
+            #victory .victory-title {
+                font-family: "Creepster", cursive;
+                font-size: clamp(3rem, 10vw, 7rem);
+                color: #00ffaa;
+                letter-spacing: 0.08em;
+                text-shadow:
+                    0 0 30px rgba(0, 255, 170, 0.8),
+                    0 0 80px rgba(0, 200, 120, 0.4),
+                    3px 5px 10px #000;
+                animation: victoryPulse 1.5s ease-in-out infinite alternate;
+                user-select: none;
+            }
+
+            @keyframes victoryPulse {
+                from { transform: scale(1); filter: brightness(1); }
+                to   { transform: scale(1.03); filter: brightness(1.2); }
+            }
+
+            #victory .victory-sub {
+                font-family: "Oswald", sans-serif;
+                font-size: clamp(1rem, 3vw, 1.8rem);
+                font-weight: 300;
+                letter-spacing: 0.35em;
+                text-transform: uppercase;
+                color: rgba(200, 255, 230, 0.85);
+                text-shadow: 0 0 16px rgba(0, 200, 120, 0.6);
+                user-select: none;
+            }
+
+            #victory .victory-score {
+                font-family: "Oswald", sans-serif;
+                font-size: clamp(0.75rem, 2vw, 1.1rem);
+                font-weight: 300;
+                letter-spacing: 0.25em;
+                text-transform: uppercase;
+                color: rgba(180, 255, 220, 0.7);
+                text-shadow: 0 0 10px rgba(0, 200, 120, 0.5);
+                user-select: none;
+            }
+
+            #victory .glow-line {
+                width: min(500px, 80vw);
+                height: 2px;
+                background: linear-gradient(
+                    to right,
+                    transparent,
+                    rgba(0, 255, 170, 0.9),
+                    transparent
+                );
+                box-shadow: 0 0 12px rgba(0, 200, 120, 0.6);
+            }
+
+            /* ─────────────────────────────────────────
+         GHOST WAKE ALERT — full screen flash
+      ───────────────────────────────────────── */
+            #ghostWake {
+                position: fixed;
+                inset: 0;
+                z-index: 90;
+                display: none;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 12px;
+                pointer-events: none;
+                background: rgba(0, 0, 0, 0.6);
+                box-shadow: inset 0 0 200px rgba(0, 200, 120, 0.4);
+                animation: ghostWakeFlash 0.15s ease-out;
+            }
+
+            #ghostWake.visible {
+                display: flex;
+                animation: ghostWakeFade 3.5s ease-out forwards;
+            }
+
+            @keyframes ghostWakeFade {
+                0%   { opacity: 0; }
+                8%   { opacity: 1; }
+                60%  { opacity: 1; }
+                100% { opacity: 0; }
+            }
+
+            #ghostWake .wake-text {
+                font-family: "Creepster", cursive;
+                font-size: clamp(2rem, 8vw, 5rem);
+                color: #00ffaa;
+                letter-spacing: 0.1em;
+                text-shadow:
+                    0 0 20px rgba(0, 255, 170, 0.9),
+                    0 0 60px rgba(0, 200, 120, 0.5),
+                    0 0 120px rgba(0, 150, 80, 0.3);
+                animation: wakePulse 0.2s ease-in-out infinite alternate;
+                user-select: none;
+            }
+
+            @keyframes wakePulse {
+                from { transform: scale(1); filter: brightness(1); }
+                to   { transform: scale(1.05); filter: brightness(1.3); }
+            }
+
+            #ghostWake .wake-sub {
+                font-family: "Oswald", sans-serif;
+                font-size: clamp(0.8rem, 2.5vw, 1.3rem);
+                font-weight: 300;
+                letter-spacing: 0.4em;
+                text-transform: uppercase;
+                color: rgba(200, 255, 230, 0.7);
+                text-shadow: 0 0 12px rgba(0, 200, 120, 0.5);
+                user-select: none;
+            }
+
+            /* ─────────────────────────────────────────
          HUD — top-left kill counter
       ───────────────────────────────────────── */
             #hud {
@@ -418,7 +555,7 @@
             }
 
             /* ─────────────────────────────────────────
-         CROSSHAIR (purely CSS, no image needed)
+         CROSSHAIR — large circle reticle
       ───────────────────────────────────────── */
             #crosshair {
                 position: fixed;
@@ -427,38 +564,46 @@
                 transform: translate(-50%, -50%);
                 z-index: 15;
                 display: none; /* shown once game starts */
-                width: 16px;
-                height: 16px;
+                width: 48px;
+                height: 48px;
                 pointer-events: none;
+                border: 1.5px solid rgba(255, 255, 255, 0.4);
+                border-radius: 50%;
+                box-shadow:
+                    0 0 6px rgba(200, 60, 30, 0.3),
+                    inset 0 0 6px rgba(200, 60, 30, 0.15);
             }
 
             #crosshair.active {
                 display: block;
             }
 
-            #crosshair::before,
+            /* center dot */
+            #crosshair::before {
+                content: "";
+                position: absolute;
+                width: 4px;
+                height: 4px;
+                background: rgba(255, 100, 80, 0.8);
+                border-radius: 50%;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                box-shadow: 0 0 4px rgba(255, 80, 60, 0.6);
+            }
+
+            /* short cross lines inside the circle */
             #crosshair::after {
                 content: "";
                 position: absolute;
-                background: rgba(255, 255, 255, 0.55);
-            }
-
-            /* horizontal bar */
-            #crosshair::before {
-                width: 100%;
-                height: 1px;
                 top: 50%;
-                left: 0;
-                transform: translateY(-50%);
-            }
-
-            /* vertical bar */
-            #crosshair::after {
-                width: 1px;
-                height: 100%;
                 left: 50%;
-                top: 0;
-                transform: translateX(-50%);
+                width: 12px;
+                height: 12px;
+                transform: translate(-50%, -50%);
+                background:
+                    linear-gradient(to right, transparent 0%, transparent 20%, rgba(255,255,255,0.3) 20%, rgba(255,255,255,0.3) 22%, transparent 22%, transparent 78%, rgba(255,255,255,0.3) 78%, rgba(255,255,255,0.3) 80%, transparent 80%),
+                    linear-gradient(to bottom, transparent 0%, transparent 20%, rgba(255,255,255,0.3) 20%, rgba(255,255,255,0.3) 22%, transparent 22%, transparent 78%, rgba(255,255,255,0.3) 78%, rgba(255,255,255,0.3) 80%, transparent 80%);
             }
 
             /* ─────────────────────────────────────────
@@ -626,6 +771,108 @@
             #qrClose:hover {
                 color: #aaa;
             }
+            /* ─────────────────────────────────────────
+         NOISE METER — bottom-left sound level
+      ───────────────────────────────────────── */
+            #noiseMeter {
+                position: fixed;
+                bottom: 24px;
+                left: 24px;
+                z-index: 20;
+                display: none;
+                flex-direction: column;
+                gap: 4px;
+                pointer-events: none;
+                width: 140px;
+            }
+
+            #noiseMeter.active {
+                display: flex;
+            }
+
+            #noiseMeter .noise-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 6px;
+            }
+
+            #noiseMeter .noise-title {
+                font-size: 0.6rem;
+                letter-spacing: 0.3em;
+                text-transform: uppercase;
+                color: #555;
+            }
+
+            #noiseIcon {
+                font-size: 0.85rem;
+                opacity: 0.3;
+                transition: opacity 0.2s, filter 0.2s;
+            }
+
+            #noiseLabel {
+                font-family: "Oswald", sans-serif;
+                font-size: 0.65rem;
+                font-weight: 400;
+                letter-spacing: 0.2em;
+                text-transform: uppercase;
+                color: #2a6e2a;
+                transition: color 0.3s;
+            }
+
+            .noise-track {
+                width: 100%;
+                height: 5px;
+                background: rgba(255, 255, 255, 0.06);
+                border-radius: 3px;
+                overflow: hidden;
+                border: 1px solid rgba(255, 255, 255, 0.05);
+            }
+
+            #noiseFill {
+                height: 100%;
+                width: 0%;
+                background: #2a6e2a;
+                border-radius: 3px;
+                transition: width 0.08s linear, background 0.3s, box-shadow 0.3s;
+            }
+
+            /* ─────────────────────────────────────────
+         TORCH VIGNETTE — dark edges simulating flashlight cone
+      ───────────────────────────────────────── */
+            #torchVignette {
+                position: fixed;
+                inset: 0;
+                z-index: 5;
+                pointer-events: none;
+                background: radial-gradient(
+                    ellipse 95% 90% at 50% 50%,
+                    transparent 0%,
+                    transparent 75%,
+                    rgba(0, 0, 0, 0.08) 88%,
+                    rgba(0, 0, 0, 0.2) 96%,
+                    rgba(0, 0, 0, 0.35) 100%
+                );
+            }
+
+            /* Subtle animated noise texture for dust particles in the light */
+            #torchNoise {
+                position: fixed;
+                inset: 0;
+                z-index: 6;
+                pointer-events: none;
+                opacity: 0.04;
+                mix-blend-mode: screen;
+                background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+                animation: noiseShift 0.15s steps(3) infinite;
+            }
+
+            @keyframes noiseShift {
+                0%   { transform: translate(0, 0); }
+                33%  { transform: translate(-2px, 1px); }
+                66%  { transform: translate(1px, -1px); }
+                100% { transform: translate(0, 0); }
+            }
         </style>
     </head>
 
@@ -634,6 +881,12 @@
          THREE.JS RENDER TARGET
     ════════════════════════════════════════════ -->
         <canvas id="c"></canvas>
+
+        <!-- ═══════════════════════════════════════════
+         TORCH VIGNETTE OVERLAY — dark room effect
+    ════════════════════════════════════════════ -->
+        <div id="torchVignette" aria-hidden="true"></div>
+        <div id="torchNoise" aria-hidden="true"></div>
 
         <!-- ═══════════════════════════════════════════
          TITLE / START OVERLAY
@@ -648,8 +901,8 @@
             </button>
 
             <p class="instructions">
-                <span>WASD</span> — move &nbsp;|&nbsp; <span>Mouse</span> —
-                look<br />
+                <span>WASD</span> — move &nbsp;|&nbsp; <span>Shift</span> —
+                sprint &nbsp;|&nbsp; <span>Mouse</span> — look<br />
                 <span>Left Click</span> — shoot &nbsp;|&nbsp; <span>R</span> —
                 reload<br />
                 Survive. Kill them all. Don't get caught.
@@ -692,11 +945,32 @@
         <div id="jumpscare" role="alert" aria-live="assertive">
             <div class="crack"></div>
             <p class="scare-title">YOU WERE CAUGHT</p>
-            <p class="scare-sub">The horde got you</p>
+            <p class="scare-sub">The ghost got you</p>
             <p class="scare-score">
                 Zombies killed: <span id="scareFinalScore">0</span>
             </p>
             <div class="crack"></div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════
+         GHOST WAKE ALERT (hidden by default)
+    ════════════════════════════════════════════ -->
+        <div id="ghostWake" aria-live="assertive">
+            <p class="wake-text">⚠ IT HAS AWAKENED ⚠</p>
+            <p class="wake-sub">Something stirs in the darkness</p>
+        </div>
+
+        <!-- ═══════════════════════════════════════════
+         VICTORY OVERLAY (hidden by default)
+    ════════════════════════════════════════════ -->
+        <div id="victory" role="alert" aria-live="assertive">
+            <div class="glow-line"></div>
+            <p class="victory-title">GHOST SLAIN</p>
+            <p class="victory-sub">The darkness has been lifted</p>
+            <p class="victory-score">
+                Zombies killed: <span id="victoryScore">0</span>
+            </p>
+            <div class="glow-line"></div>
         </div>
 
         <!-- ═══════════════════════════════════════════
@@ -718,6 +992,20 @@
             <span class="ammo-label">Ammo</span>
             <!-- ammoVal is updated by main.js -->
             <span id="ammoVal">10 / 10</span>
+        </div>
+
+        <!-- ═══════════════════════════════════════════
+         NOISE METER — bottom-left sound level indicator
+    ════════════════════════════════════════════ -->
+        <div id="noiseMeter" aria-label="Noise level meter">
+            <div class="noise-header">
+                <span class="noise-title">Sound Level</span>
+                <span id="noiseIcon">🔊</span>
+            </div>
+            <div class="noise-track">
+                <div id="noiseFill"></div>
+            </div>
+            <span id="noiseLabel">SILENT</span>
         </div>
 
         <!-- ═══════════════════════════════════════════
