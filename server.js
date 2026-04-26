@@ -148,7 +148,9 @@ wss.on("connection", (ws, req) => {
       msg.type === "fire" ||
       msg.type === "reload" ||
       msg.type === "calibrate" ||
-      msg.type === "start"
+      msg.type === "start" ||
+      msg.type === "move" ||
+      msg.type === "stop"
     ) {
       console.log(`  🎮  ${msg.type} from controller`);
       broadcast(gameClient, msg);
