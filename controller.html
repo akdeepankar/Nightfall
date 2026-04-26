@@ -353,13 +353,11 @@
                 </div>
             </div>
 
-            <!-- Action Buttons -->
             <div id="actions">
                 <button id="reconnect" class="btn-ghost">CONNECT</button>
                 <button id="enable">ENABLE MOTION</button>
                 <button id="start" class="btn-ghost">START</button>
                 <button id="reload" class="btn-warn">RELOAD</button>
-                <button id="cal">CAL</button>
             </div>
         </div>
 
@@ -384,7 +382,7 @@
                 height: 100%;
                 display: flex;
                 flex-direction: column;
-                padding: 20px;
+                padding: 20px 20px 40px 20px;
                 gap: 20px;
             }
 
@@ -452,7 +450,7 @@
 
             #actions {
                 display: grid;
-                grid-template-columns: repeat(5, 1fr);
+                grid-template-columns: repeat(4, 1fr);
                 gap: 8px;
             }
 
@@ -912,19 +910,7 @@
                 }, 2500);
             }
 
-            function calibrate() {
-                smoothDX = 0;
-                smoothDY = 0;
-                ax = 0;
-                ay = 0;
-                az = 0;
-                lastOrientationAlpha = null;
-                lastOrientationBeta = null;
-                lastOrientationGamma = null;
-                // Keep existing stream flags so UI remains accurate.
-                send({ type: "calibrate" }); // optional; desktop may ignore
-                showToast("Motion control reset");
-            }
+
 
             el("reconnect").onclick = () => {
                 try {
@@ -948,7 +934,7 @@
                 send({ type: "reload" });
                 showToast("Reload sent");
             };
-            el("cal").onclick = calibrate;
+
 
             fire.addEventListener(
                 "touchstart",
