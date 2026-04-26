@@ -316,6 +316,13 @@
         </style>
     </head>
     <body>
+        <div id="start-overlay">
+            <div class="start-content">
+                <h1>NIGHTFALL</h1>
+                <p>TAP TO START CONTROLLER</p>
+            </div>
+        </div>
+
         <div id="app">
             <!-- Minimal Status Bar -->
             <div id="status-bar">
@@ -523,7 +530,15 @@
                 opacity: 0; transition: opacity 0.2s, transform 0.2s;
                 z-index: 200; pointer-events: none;
             }
-            #toast.show { opacity: 1; transform: translate(-50%, 10px); }
+            #start-overlay {
+                position: fixed; inset: 0; z-index: 1000;
+                background: #000; display: flex; align-items: center; justify-content: center;
+                cursor: pointer; transition: opacity 0.4s;
+            }
+            .start-content { text-align: center; }
+            .start-content h1 { font-family: -apple-system, system-ui, sans-serif; font-weight: 900; letter-spacing: 0.3em; color: #ff3e3e; margin-bottom: 10px; }
+            .start-content p { font-size: 10px; letter-spacing: 0.2em; color: #555; }
+            #start-overlay.hidden { opacity: 0; pointer-events: none; }
         </style>
 
 
@@ -1064,8 +1079,17 @@
                 }
             });
 
+            el("start-overlay").onclick = async () => {
+                el("start-overlay").classList.add("hidden");
+                // Trigger both motion and connection on first tap
+                await enableMotion();
+                if (!ws || ws.readyState !== 1) connect();
+                showToast("Controller Started");
+            };
+
             renderAmmo(10, 10);
-            connect();
+            // Don't auto-connect here anymore, let the overlay handle it for gesture-bound APIs
+            // connect(); 
             setInterval(() => send({ type: "ping", t: Date.now() }), 12000);
         </script>
     </body>
