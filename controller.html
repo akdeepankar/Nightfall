@@ -332,6 +332,7 @@
                     <span id="sensorTxt">MOTION</span>
                 </div>
                 <div id="host" style="display: none;"></div>
+                <div id="linkSub" style="display: none;"></div>
             </div>
 
             <!-- Ammo Indicator -->
@@ -354,6 +355,7 @@
 
             <!-- Action Buttons -->
             <div id="actions">
+                <button id="reconnect" class="btn-ghost">CONNECT</button>
                 <button id="enable">ENABLE MOTION</button>
                 <button id="start" class="btn-ghost">START</button>
                 <button id="reload" class="btn-warn">RELOAD</button>
@@ -450,8 +452,8 @@
 
             #actions {
                 display: grid;
-                grid-template-columns: 2fr 1fr 1.5fr 1fr;
-                gap: 10px;
+                grid-template-columns: repeat(5, 1fr);
+                gap: 8px;
             }
 
             #actions button {
