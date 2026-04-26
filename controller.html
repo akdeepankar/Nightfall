@@ -317,104 +317,175 @@
     </head>
     <body>
         <div id="app">
-            <div class="card">
-                <div class="row">
-                    <div class="title">Controller</div>
-                    <div>
-                        <span id="wsDot" class="dot warn"></span>
-                        <span
-                            id="wsTxt"
-                            style="font-size: 11px; color: var(--muted)"
-                            >Connecting</span
-                        >
-                    </div>
+            <!-- Minimal Status Bar -->
+            <div id="status-bar">
+                <div class="status-item">
+                    <span id="wsDot" class="dot warn"></span>
+                    <span id="wsTxt">WS</span>
                 </div>
-                <div id="host" class="sub">Server: …</div>
-            </div>
-
-            <div class="card" id="triple">
-                <div>
-                    <div class="title">Link</div>
-                    <div id="linkSub" class="sub">Offline</div>
-                </div>
-                <div>
+                <div class="status-item">
                     <span id="ctrlDot" class="dot bad"></span>
-                    <span
-                        id="ctrlTxt"
-                        style="font-size: 11px; color: var(--muted)"
-                        >Off</span
-                    >
+                    <span id="ctrlTxt">LINK</span>
                 </div>
-                <button id="reconnect" class="btn-ghost">Reconnect</button>
-            </div>
-
-            <div class="card" id="triple">
-                <div>
-                    <div class="title">Motion</div>
-                    <div id="sensorSub" class="sub">Tap Enable</div>
-                </div>
-                <div>
+                <div class="status-item">
                     <span id="sensorDot" class="dot warn"></span>
-                    <span
-                        id="sensorTxt"
-                        style="font-size: 11px; color: var(--muted)"
-                        >Off</span
-                    >
+                    <span id="sensorTxt">MOTION</span>
                 </div>
-                <button id="enable">Enable Motion</button>
+                <div id="host" style="display: none;"></div>
             </div>
 
-            <div id="main">
-                <div class="card row">
-                    <div id="ammo"></div>
-                    <div
-                        style="
-                            font-size: 11px;
-                            color: var(--muted);
-                            letter-spacing: 0.07em;
-                            text-transform: uppercase;
-                        "
-                    >
-                        Move Phone = Look
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="row">
-                        <span style="font-size: 11px; color: var(--muted)"
-                            >Shake</span
-                        >
-                        <span
-                            id="pct"
-                            style="font-size: 11px; color: var(--muted)"
-                            >0%</span
-                        >
-                    </div>
-                    <div
-                        id="sensorCounts"
-                        style="
-                            margin-top: 4px;
-                            font-size: 11px;
-                            color: var(--muted);
-                        "
-                    >
-                        M: 0 • O: 0
-                    </div>
-                    <div id="bar"><div id="fill"></div></div>
-                </div>
-
-                <button id="fire" aria-label="Fire">Fire</button>
+            <!-- Ammo Indicator -->
+            <div id="ammo-container">
+                <div id="ammo"></div>
             </div>
 
-            <div id="bottom">
-                <button id="start" class="btn-ghost">Start Game</button>
-                <button id="reload" class="btn-warn">Reload</button>
-                <button id="cal">Calibrate</button>
+            <!-- Main Control Area -->
+            <div id="controls">
+                <button id="fire" aria-label="Fire">FIRE</button>
+                
+                <!-- Hidden/Optional Info -->
+                <div id="motion-overlay">
+                    <div id="sensorSub" style="display: none;"></div>
+                    <div id="sensorCounts" style="display: none;"></div>
+                    <div id="pct" style="display: none;">0%</div>
+                    <div id="bar" style="visibility: hidden;"><div id="fill"></div></div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div id="actions">
+                <button id="enable">ENABLE MOTION</button>
+                <button id="start" class="btn-ghost">START</button>
+                <button id="reload" class="btn-warn">RELOAD</button>
+                <button id="cal">CAL</button>
             </div>
         </div>
 
-        <div id="flash"></div>
-        <div id="toast"></div>
+        <style>
+            :root {
+                --bg: #05070a;
+                --accent: #ff3e3e;
+                --text: #ffffff;
+                --muted: rgba(255, 255, 255, 0.4);
+            }
+
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            html, body {
+                width: 100%; height: 100%; overflow: hidden;
+                background: var(--bg);
+                color: var(--text);
+                font-family: -apple-system, system-ui, sans-serif;
+                user-select: none; touch-action: none;
+            }
+
+            #app {
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                padding: 20px;
+                gap: 20px;
+            }
+
+            #status-bar {
+                display: flex;
+                justify-content: center;
+                gap: 20px;
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 0.1em;
+                color: var(--muted);
+            }
+
+            .status-item { display: flex; align-items: center; gap: 6px; }
+            .dot { width: 6px; height: 6px; border-radius: 50%; background: #444; }
+            .dot.ok { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
+            .dot.warn { background: #ffaa00; box-shadow: 0 0 8px #ffaa00; }
+            .dot.bad { background: #ff3e3e; box-shadow: 0 0 8px #ff3e3e; }
+
+            #ammo-container {
+                display: flex;
+                justify-content: center;
+            }
+            #ammo {
+                display: flex;
+                gap: 8px;
+            }
+            .ammo-dot {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                background: #fde047;
+                transition: opacity 0.2s, transform 0.2s;
+            }
+            .ammo-dot.spent {
+                opacity: 0.15;
+                transform: scale(0.8);
+            }
+
+            #controls {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+
+            #fire {
+                width: 100%;
+                height: 60vh;
+                background: linear-gradient(135deg, #1a0505 0%, #3a0a0a 100%);
+                border: 2px solid #5a1a1a;
+                border-radius: 24px;
+                color: #fff;
+                font-size: 48px;
+                font-weight: 900;
+                letter-spacing: 0.2em;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+                transition: transform 0.1s, background 0.1s;
+                -webkit-tap-highlight-color: transparent;
+            }
+            #fire:active {
+                transform: scale(0.98);
+                background: #5a1a1a;
+            }
+
+            #actions {
+                display: grid;
+                grid-template-columns: 2fr 1fr 1.5fr 1fr;
+                gap: 10px;
+            }
+
+            #actions button {
+                padding: 15px 5px;
+                border-radius: 12px;
+                border: 1px solid rgba(255,255,255,0.1);
+                background: rgba(255,255,255,0.05);
+                color: #fff;
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+            }
+
+            #actions .btn-warn { background: #ffaa00; color: #000; border: none; }
+            #actions .btn-ghost { background: rgba(0, 255, 136, 0.1); border-color: rgba(0, 255, 136, 0.3); color: #00ff88; }
+
+            #flash {
+                position: fixed; inset: 0; pointer-events: none; opacity: 0;
+                background: #fff; z-index: 100;
+            }
+            #flash.show { animation: flashOut 0.15s ease-out; }
+            @keyframes flashOut { 0% { opacity: 0.4; } 100% { opacity: 0; } }
+
+            #toast {
+                position: fixed; left: 50%; top: 20px; transform: translateX(-50%);
+                background: rgba(255,255,255,0.9); color: #000;
+                padding: 10px 20px; border-radius: 20px; font-size: 12px; font-weight: 700;
+                opacity: 0; transition: opacity 0.2s, transform 0.2s;
+                z-index: 200; pointer-events: none;
+            }
+            #toast.show { opacity: 1; transform: translate(-50%, 10px); }
+        </style>
+
 
         <script>
             const el = (id) => document.getElementById(id);

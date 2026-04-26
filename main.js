@@ -33,7 +33,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x020513);
-scene.fog = new THREE.FogExp2(0x020513, 0.025);
+scene.fog = new THREE.FogExp2(0x020513, 0.002);
 
 const starField = createStarField();
 scene.add(starField);
@@ -288,10 +288,11 @@ document.addEventListener("mousedown", (e) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Near-zero ambient — the room is almost pitch black
-scene.add(new THREE.AmbientLight(0x080810, 0.15));
+scene.add(new THREE.AmbientLight(0xffffff, 1.0));
 
 // ── TORCH / FLASHLIGHT ──────────────────────────────────────────────────────
 // SpotLight creates the classic flashlight cone
+/*
 const torch = new THREE.SpotLight(0xffe0a0, 3.5, 18, Math.PI / 6, 0.45, 1.6);
 torch.position.set(0, -0.1, -0.3);
 torch.castShadow = true;
@@ -300,17 +301,16 @@ torch.shadow.camera.near = 0.1;
 torch.shadow.camera.far = 18;
 torch.shadow.bias = -0.002;
 
-// Torch target — aim forward into the scene
 const torchTarget = new THREE.Object3D();
 torchTarget.position.set(0, -0.05, -5);
 pitchObject.add(torchTarget);
 torch.target = torchTarget;
 pitchObject.add(torch);
 
-// Close-range fill light so the gun/walls nearby aren't completely invisible
 const lantern = new THREE.PointLight(0xffd580, 0.4, 4);
 lantern.position.set(0, -0.15, -0.4);
 pitchObject.add(lantern);
+*/
 
 // Torch flicker state
 const TORCH_BASE_INTENSITY = 3.5;
@@ -1256,6 +1256,7 @@ function flickerLightsUpdate(delta) {
     );
   });
 
+  /*
   // Torch flicker — organic, fire-like intensity variation
   torchFlickerSeed += (delta || 16) * 0.008;
   const flicker1 = Math.sin(torchFlickerSeed * 3.7) * 0.15;
@@ -1269,6 +1270,7 @@ function flickerLightsUpdate(delta) {
 
   // Lantern (close fill) also flickers slightly
   lantern.intensity = 0.4 + (Math.random() - 0.5) * 0.06;
+  */
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1403,6 +1405,7 @@ function wakeGhost() {
     setTimeout(() => wakeOverlay.classList.remove('visible'), 3500);
   }
 
+  /*
   // Violent torch flicker for 1 second
   const origIntensity = torch.intensity;
   let flickerCount = 0;
@@ -1414,6 +1417,7 @@ function wakeGhost() {
       torch.intensity = origIntensity;
     }
   }, 70);
+  */
 
   playGhostWake();
 }
