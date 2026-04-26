@@ -348,6 +348,30 @@
                 color: rgba(180, 255, 220, 0.7);
                 text-shadow: 0 0 10px rgba(0, 200, 120, 0.5);
                 user-select: none;
+                margin-bottom: 25px;
+            }
+
+            .victory-btn {
+                background: linear-gradient(180deg, #00ffcc, #0088aa);
+                border: none;
+                color: #000;
+                padding: 12px 30px;
+                font-family: "Oswald", sans-serif;
+                font-size: 1rem;
+                font-weight: 700;
+                letter-spacing: 0.2em;
+                text-transform: uppercase;
+                border-radius: 4px;
+                cursor: pointer;
+                box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+                transition: transform 0.2s, box-shadow 0.2s;
+                margin-top: 10px;
+                margin-bottom: 25px;
+            }
+
+            .victory-btn:hover {
+                transform: scale(1.05);
+                box-shadow: 0 0 30px rgba(0, 255, 204, 0.6);
             }
 
             #victory .glow-line {
@@ -975,6 +999,7 @@
             <p class="victory-score">
                 Zombies killed: <span id="victoryScore">0</span>
             </p>
+            <button id="nextLevelBtn" class="victory-btn">Next Level</button>
             <div class="glow-line"></div>
         </div>
 

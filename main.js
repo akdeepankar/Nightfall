@@ -20,6 +20,7 @@ let ammo = 10;
 const MAX_AMMO = 10;
 let isReloading = false;
 let canFire = true;
+let victory = false;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §2  RENDERER & SCENE
@@ -864,13 +865,18 @@ function fireGun() {
 
   // Also collect ghost meshes for shooting
   const ghostTargets = [];
-  if (ghost && ghost.state === 'hunting') {
-    ghost.mesh.traverse((child) => {
-      if (child.isMesh) ghostTargets.push(child);
-    });
-  }
+  ghosts.forEach((g) => {
+    if (g.state === "hunting") {
+      g.mesh.traverse((child) => {
+        if (child.isMesh) ghostTargets.push({ mesh: child, ghost: g });
+      });
+    }
+  });
 
-  const allShootable = [...targets.map((t) => t.mesh), ...ghostTargets];
+  const allShootable = [
+    ...targets.map((t) => t.mesh),
+    ...ghostTargets.map((gt) => gt.mesh),
+  ];
   const hits = raycaster.intersectObjects(allShootable);
   if (hits.length > 0) {
     const hitObj = hits[0].object;
@@ -878,8 +884,9 @@ function fireGun() {
     const entry = targets.find((t) => t.mesh === hitObj);
     if (entry) {
       hitZombie(entry.zombie);
-    } else if (ghostTargets.includes(hitObj)) {
-      hitGhost();
+    } else {
+      const gEntry = ghostTargets.find((gt) => gt.mesh === hitObj);
+      if (gEntry) hitGhost(gEntry.ghost);
     }
   }
 
@@ -1255,22 +1262,6 @@ function flickerLightsUpdate(delta) {
       flickerBaseIntensity[i] + (Math.random() * 2 - 1) * 0.04,
     );
   });
-
-  /*
-  // Torch flicker — organic, fire-like intensity variation
-  torchFlickerSeed += (delta || 16) * 0.008;
-  const flicker1 = Math.sin(torchFlickerSeed * 3.7) * 0.15;
-  const flicker2 = Math.sin(torchFlickerSeed * 7.3 + 1.2) * 0.08;
-  const flicker3 = Math.sin(torchFlickerSeed * 13.1 + 4.5) * 0.05;
-  const randomJitter = (Math.random() - 0.5) * 0.12;
-  torch.intensity = TORCH_BASE_INTENSITY + flicker1 + flicker2 + flicker3 + randomJitter;
-
-  // Slight angle wobble for realism
-  torch.angle = TORCH_BASE_ANGLE + Math.sin(torchFlickerSeed * 2.1) * 0.015;
-
-  // Lantern (close fill) also flickers slightly
-  lantern.intensity = 0.4 + (Math.random() - 0.5) * 0.06;
-  */
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1300,6 +1291,149 @@ function updateGunAnimation(delta) {
   gunGroup.position.set(0.22 + swayX, -0.2 + swayY + bobY, -0.38 + kickZ);
 }
 
+function updateGhosts(delta) {
+  if (ghosts.length === 0) return;
+
+  const px = yawObject.position.x;
+  const pz = yawObject.position.z;
+
+  let allDead = true;
+
+  ghosts.forEach((g) => {
+    if (g.state === "dead") return;
+    allDead = false;
+
+    const gx = g.mesh.position.x;
+    const gz = g.mesh.position.z;
+    const ddx = px - gx;
+    const ddz = pz - gz;
+    const dist = Math.sqrt(ddx * ddx + ddz * ddz);
+
+    // Bobbing float animation
+    g.bobTimer += delta * 0.003;
+    const floatY = 0.15 + Math.sin(g.bobTimer) * 0.12;
+    g.mesh.position.y = floatY;
+
+    // --- DYING: fade out and shrink ---
+    if (g.state === "dying") {
+      g.deathTimer -= delta;
+      const t = Math.max(0, g.deathTimer / 1200);
+      g.mesh.userData.ghostMat.opacity = 0.55 * t;
+      g.mesh.userData.eyeMat.opacity = 0.9 * t;
+      g.mesh.userData.ghostLight.intensity = 1.5 * t;
+      g.mesh.scale.set(1 + (1 - t) * 0.3, t, 1 + (1 - t) * 0.3);
+      if (g.deathTimer <= 0) {
+        g.state = "dead";
+        scene.remove(g.mesh);
+      }
+      return;
+    }
+
+    // --- SLEEPING: check if noise level hits danger ---
+    if (g.state === "sleeping") {
+      if (noiseLevel >= 0.7) {
+        wakeGhosts();
+      }
+      return;
+    }
+
+    // --- HUNTING ---
+    // Contact → game over
+    if (dist < GHOST_ATTACK_DIST) {
+      triggerGameOver();
+      return;
+    }
+
+    // Proximity-based ghost sound
+    g.groanTimer -= delta;
+    if (g.groanTimer <= 0) {
+      const volume = Math.max(0.05, Math.min(1, (15 - dist) / 15));
+      playGhostGroan(volume);
+      // Closer = more frequent groans
+      g.groanTimer =
+        dist < 5 ? 800 + Math.random() * 1200 : 2000 + Math.random() * 3000;
+    }
+
+    // Ghost light pulses with proximity
+    g.mesh.userData.ghostLight.intensity =
+      0.5 + Math.max(0, (12 - dist) / 12) * 2.0;
+
+    // Movement: chase player with wall avoidance
+    const spd = GHOST_SPEED * (delta / 16.67);
+    const nx = (ddx / dist) * spd;
+    const nz = (ddz / dist) * spd;
+
+    if (!collidesWithWalls(gx + nx, gz + nz, 0.35)) {
+      g.mesh.position.x += nx;
+      g.mesh.position.z += nz;
+    } else if (!collidesWithWalls(gx + nx, gz, 0.35)) {
+      g.mesh.position.x += nx;
+    } else if (!collidesWithWalls(gx, gz + nz, 0.35)) {
+      g.mesh.position.z += nz;
+    } else {
+      // Try to go around
+      g.wanderTimer -= delta;
+      if (g.wanderTimer <= 0) {
+        g.wanderAngle = Math.atan2(ddx, ddz) + (Math.random() - 0.5) * 2;
+        g.wanderTimer = 500;
+      }
+      const wx = Math.sin(g.wanderAngle) * spd;
+      const wz = Math.cos(g.wanderAngle) * spd;
+      if (!collidesWithWalls(gx + wx, gz + wz, 0.35)) {
+        g.mesh.position.x += wx;
+        g.mesh.position.z += wz;
+      }
+    }
+
+    // Face the player
+    g.mesh.rotation.y = Math.atan2(ddx, ddz);
+  });
+
+  if (allDead && gameStarted && !victory) {
+    triggerVictory();
+  }
+}
+
+function triggerVictory() {
+  if (gameOver || victory) return;
+  victory = true;
+  if (document.exitPointerLock) document.exitPointerLock();
+  isLocked = false;
+
+  const scoreEl = document.getElementById("victoryScore");
+  if (scoreEl) scoreEl.textContent = score;
+  if (victoryEl) victoryEl.classList.add("visible");
+}
+
+function nextLevel() {
+  if (!victory) return;
+  victory = false;
+  if (victoryEl) victoryEl.classList.remove("visible");
+
+  currentLevel++;
+  // Reset player position for fresh start
+  yawObject.position.set(0, 0, 0);
+  pitchObject.rotation.set(0, 0, 0);
+  yawObject.rotation.set(0, 0, 0);
+
+  // Clear ghosts and spawn more
+  ghosts.forEach((g) => scene.remove(g.mesh));
+  ghosts = [];
+  spawnGhosts(currentLevel);
+
+  // Reset zombies too
+  zombies.forEach((z) => scene.remove(z.mesh));
+  zombies = [];
+  spawnZombies();
+
+  requestLock();
+  showWarning(`LEVEL ${currentLevel}: ${currentLevel} GHOSTS ACTIVE`);
+}
+
+if (document.getElementById("nextLevelBtn")) {
+  document.getElementById("nextLevelBtn").addEventListener("click", nextLevel);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // §19  GHOST SYSTEM
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1308,7 +1442,8 @@ const GHOST_SPEED = 0.022;
 const GHOST_ATTACK_DIST = 1.3;
 const GHOST_WANDER_SPEED = 0.012;
 
-let ghost = null; // { mesh, hp, state, wanderAngle, wanderTimer, groanTimer, bobTimer, flashTimer }
+let currentLevel = 1;
+let ghosts = []; // Array of ghost objects
 
 function buildGhostMesh() {
   const g = new THREE.Group();
@@ -1366,69 +1501,63 @@ function buildGhostMesh() {
   return g;
 }
 
-function spawnGhost() {
-  if (ghost) return;
-  const mesh = buildGhostMesh();
-  // Spawn far from player, in a corner
-  mesh.position.set(-15, 0, 15);
-  scene.add(mesh);
+function spawnGhosts(count) {
+  for (let i = 0; i < count; i++) {
+    const mesh = buildGhostMesh();
+    // Spawn far from player, spread out
+    const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.5);
+    const dist = 15 + Math.random() * 5;
+    mesh.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+    scene.add(mesh);
 
-  ghost = {
-    mesh,
-    hp: GHOST_HP,
-    state: 'sleeping', // sleeping → hunting → dying → dead
-    wanderAngle: Math.random() * Math.PI * 2,
-    wanderTimer: 0,
-    groanTimer: 2000,
-    bobTimer: 0,
-    flashTimer: 0,
-    deathTimer: 0,
-  };
+    ghosts.push({
+      mesh,
+      hp: GHOST_HP,
+      state: "sleeping", // sleeping → hunting → dying → dead
+      wanderAngle: Math.random() * Math.PI * 2,
+      wanderTimer: 0,
+      groanTimer: 2000 + Math.random() * 3000,
+      bobTimer: Math.random() * 1000,
+      flashTimer: 0,
+      deathTimer: 0,
+    });
 
-  // Sleeping: eyes dimmed, no glow
-  mesh.userData.eyeMat.opacity = 0.2;
-  mesh.userData.ghostLight.intensity = 0;
-  mesh.userData.ghostMat.opacity = 0.25;
-}
-
-function wakeGhost() {
-  if (!ghost || ghost.state !== 'sleeping') return;
-  ghost.state = 'hunting';
-  ghost.mesh.userData.eyeMat.opacity = 0.9;
-  ghost.mesh.userData.ghostLight.intensity = 1.5;
-  ghost.mesh.userData.ghostMat.opacity = 0.55;
-
-  // Dramatic full-screen wake alert
-  const wakeOverlay = document.getElementById('ghostWake');
-  if (wakeOverlay) {
-    wakeOverlay.classList.add('visible');
-    setTimeout(() => wakeOverlay.classList.remove('visible'), 3500);
+    // Sleeping: eyes dimmed, no glow
+    mesh.userData.eyeMat.opacity = 0.2;
+    mesh.userData.ghostLight.intensity = 0;
+    mesh.userData.ghostMat.opacity = 0.25;
   }
-
-  /*
-  // Violent torch flicker for 1 second
-  const origIntensity = torch.intensity;
-  let flickerCount = 0;
-  const flickerInterval = setInterval(() => {
-    torch.intensity = Math.random() < 0.5 ? 0 : TORCH_BASE_INTENSITY * 1.5;
-    flickerCount++;
-    if (flickerCount > 15) {
-      clearInterval(flickerInterval);
-      torch.intensity = origIntensity;
-    }
-  }, 70);
-  */
-
-  playGhostWake();
 }
 
-function hitGhost() {
-  if (!ghost || ghost.state === 'dying' || ghost.state === 'dead') return;
-  ghost.hp--;
-  ghost.flashTimer = 120;
+function wakeGhosts() {
+  let anyWoken = false;
+  ghosts.forEach((g) => {
+    if (g.state === "sleeping") {
+      g.state = "hunting";
+      g.mesh.userData.eyeMat.opacity = 0.9;
+      g.mesh.userData.ghostLight.intensity = 1.5;
+      g.mesh.userData.ghostMat.opacity = 0.55;
+      anyWoken = true;
+    }
+  });
+
+  if (anyWoken) {
+    const wakeOverlay = document.getElementById("ghostWake");
+    if (wakeOverlay) {
+      wakeOverlay.classList.add("visible");
+      setTimeout(() => wakeOverlay.classList.remove("visible"), 3500);
+    }
+    playGhostWake();
+  }
+}
+
+function hitGhost(g) {
+  if (!g || g.state === "dying" || g.state === "dead") return;
+  g.hp--;
+  g.flashTimer = 120;
 
   // Flash white on hit
-  const mat = ghost.mesh.userData.ghostMat;
+  const mat = g.mesh.userData.ghostMat;
   const origColor = mat.emissive.getHex();
   mat.emissive.set(0xffffff);
   mat.emissiveIntensity = 2.0;
@@ -1437,9 +1566,9 @@ function hitGhost() {
     mat.emissiveIntensity = 0.6;
   }, 100);
 
-  if (ghost.hp <= 0) {
-    ghost.state = 'dying';
-    ghost.deathTimer = 1200;
+  if (g.hp <= 0) {
+    g.state = "dying";
+    g.deathTimer = 1200;
     playGhostDeath();
   }
 }
@@ -1686,7 +1815,7 @@ function startGame() {
   // Second call (controller Start command) begins enemies.
   if (gameStarted) return;
   gameStarted = true;
-  spawnGhost();
+  spawnGhosts(currentLevel);
   showWarning("Be quiet... something is sleeping in the dark.");
 }
 
@@ -1957,7 +2086,7 @@ function animate() {
       }
 
       updateZombies(delta);
-      updateGhost(delta);
+      updateGhosts(delta);
       applyCameraShake();
       flickerLightsUpdate(delta);
       updateGunAnimation(delta);
