@@ -923,6 +923,7 @@ const crosshairEl = document.getElementById("crosshair");
 const overlayEl = document.getElementById("overlay");
 const enterBtnEl = document.getElementById("enterBtn");
 const jumpscareEl = document.getElementById("jumpscare");
+const victoryEl = document.getElementById("victory");
 
 let warningTimer = null;
 
@@ -1400,8 +1401,6 @@ function triggerVictory() {
   if (document.exitPointerLock) document.exitPointerLock();
   isLocked = false;
 
-  const scoreEl = document.getElementById("victoryScore");
-  if (scoreEl) scoreEl.textContent = score;
   if (victoryEl) victoryEl.classList.add("visible");
 }
 
@@ -1573,198 +1572,6 @@ function hitGhost(g) {
   }
 }
 
-function updateGhost(delta) {
-  if (!ghost || ghost.state === 'dead') return;
-
-  const px = yawObject.position.x;
-  const pz = yawObject.position.z;
-  const gx = ghost.mesh.position.x;
-  const gz = ghost.mesh.position.z;
-  const ddx = px - gx;
-  const ddz = pz - gz;
-  const dist = Math.sqrt(ddx * ddx + ddz * ddz);
-
-  // Bobbing float animation
-  ghost.bobTimer += delta * 0.003;
-  const floatY = 0.15 + Math.sin(ghost.bobTimer) * 0.12;
-  ghost.mesh.position.y = floatY;
-
-  // --- DYING: fade out and shrink ---
-  if (ghost.state === 'dying') {
-    ghost.deathTimer -= delta;
-    const t = Math.max(0, ghost.deathTimer / 1200);
-    ghost.mesh.userData.ghostMat.opacity = 0.55 * t;
-    ghost.mesh.userData.eyeMat.opacity = 0.9 * t;
-    ghost.mesh.userData.ghostLight.intensity = 1.5 * t;
-    ghost.mesh.scale.set(1 + (1 - t) * 0.3, t, 1 + (1 - t) * 0.3);
-    if (ghost.deathTimer <= 0) {
-      ghost.state = 'dead';
-      scene.remove(ghost.mesh);
-      triggerVictory();
-    }
-    return;
-  }
-
-  // --- SLEEPING: check if noise level hits danger ---
-  if (ghost.state === 'sleeping') {
-    if (noiseLevel >= 0.7) {
-      wakeGhost();
-    }
-    return;
-  }
-
-  // --- HUNTING ---
-  // Contact → game over
-  if (dist < GHOST_ATTACK_DIST) {
-    triggerGameOver();
-    return;
-  }
-
-  // Proximity-based ghost sound
-  ghost.groanTimer -= delta;
-  if (ghost.groanTimer <= 0) {
-    const volume = Math.max(0.05, Math.min(1, (15 - dist) / 15));
-    playGhostGroan(volume);
-    // Closer = more frequent groans
-    ghost.groanTimer = dist < 5 ? 800 + Math.random() * 1200 : 2000 + Math.random() * 3000;
-  }
-
-  // Ghost light pulses with proximity
-  ghost.mesh.userData.ghostLight.intensity = 0.5 + Math.max(0, (12 - dist) / 12) * 2.0;
-
-  // Movement: chase player with wall avoidance
-  const spd = GHOST_SPEED * (delta / 16.67);
-  const nx = (ddx / dist) * spd;
-  const nz = (ddz / dist) * spd;
-
-  if (!collidesWithWalls(gx + nx, gz + nz, 0.35)) {
-    ghost.mesh.position.x += nx;
-    ghost.mesh.position.z += nz;
-  } else if (!collidesWithWalls(gx + nx, gz, 0.35)) {
-    ghost.mesh.position.x += nx;
-  } else if (!collidesWithWalls(gx, gz + nz, 0.35)) {
-    ghost.mesh.position.z += nz;
-  } else {
-    // Try to go around
-    ghost.wanderTimer -= delta;
-    if (ghost.wanderTimer <= 0) {
-      ghost.wanderAngle = Math.atan2(ddx, ddz) + (Math.random() - 0.5) * 2;
-      ghost.wanderTimer = 500;
-    }
-    const wx = Math.sin(ghost.wanderAngle) * spd;
-    const wz = Math.cos(ghost.wanderAngle) * spd;
-    if (!collidesWithWalls(gx + wx, gz + wz, 0.35)) {
-      ghost.mesh.position.x += wx;
-      ghost.mesh.position.z += wz;
-    }
-  }
-
-  // Face the player
-  ghost.mesh.rotation.y = Math.atan2(ddx, ddz);
-}
-
-// --- Ghost sounds ---
-function playGhostGroan(volume) {
-  const ctx = getAudioContext();
-  const osc = ctx.createOscillator();
-  const osc2 = ctx.createOscillator();
-  const gain = ctx.createGain();
-  const now = ctx.currentTime;
-
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(90 + Math.random() * 30, now);
-  osc.frequency.linearRampToValueAtTime(60 + Math.random() * 20, now + 0.8);
-
-  osc2.type = 'sine';
-  osc2.frequency.setValueAtTime(93 + Math.random() * 10, now);
-  osc2.frequency.linearRampToValueAtTime(58, now + 0.8);
-
-  gain.gain.setValueAtTime(0, now);
-  gain.gain.linearRampToValueAtTime(volume * 0.15, now + 0.15);
-  gain.gain.linearRampToValueAtTime(0, now + 0.8);
-
-  osc.connect(gain);
-  osc2.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start(now);
-  osc2.start(now);
-  osc.stop(now + 0.85);
-  osc2.stop(now + 0.85);
-}
-
-function playGhostWake() {
-  const ctx = getAudioContext();
-  const now = ctx.currentTime;
-
-  // Layer 1: Rising screech
-  const osc1 = ctx.createOscillator();
-  const gain1 = ctx.createGain();
-  osc1.type = 'sawtooth';
-  osc1.frequency.setValueAtTime(60, now);
-  osc1.frequency.exponentialRampToValueAtTime(800, now + 0.8);
-  osc1.frequency.exponentialRampToValueAtTime(150, now + 2.0);
-  gain1.gain.setValueAtTime(0.4, now);
-  gain1.gain.linearRampToValueAtTime(0.5, now + 0.4);
-  gain1.gain.linearRampToValueAtTime(0, now + 2.0);
-  osc1.connect(gain1);
-  gain1.connect(ctx.destination);
-  osc1.start(now);
-  osc1.stop(now + 2.1);
-
-  // Layer 2: White noise burst (breath/wind)
-  const SR = ctx.sampleRate;
-  const noiseBuf = ctx.createBuffer(1, Math.floor(SR * 1.5), SR);
-  const noiseData = noiseBuf.getChannelData(0);
-  for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
-  const noiseSrc = ctx.createBufferSource();
-  noiseSrc.buffer = noiseBuf;
-  const noiseFilt = ctx.createBiquadFilter();
-  noiseFilt.type = 'bandpass';
-  noiseFilt.frequency.value = 400;
-  noiseFilt.Q.value = 2;
-  const noiseGain = ctx.createGain();
-  noiseGain.gain.setValueAtTime(0, now);
-  noiseGain.gain.linearRampToValueAtTime(0.6, now + 0.2);
-  noiseGain.gain.linearRampToValueAtTime(0, now + 1.5);
-  noiseSrc.connect(noiseFilt);
-  noiseFilt.connect(noiseGain);
-  noiseGain.connect(ctx.destination);
-  noiseSrc.start(now);
-  noiseSrc.stop(now + 1.6);
-
-  // Layer 3: Deep sub-bass rumble
-  const osc2 = ctx.createOscillator();
-  const gain2 = ctx.createGain();
-  osc2.type = 'sine';
-  osc2.frequency.setValueAtTime(30, now);
-  osc2.frequency.linearRampToValueAtTime(45, now + 1.0);
-  gain2.gain.setValueAtTime(0.3, now);
-  gain2.gain.linearRampToValueAtTime(0, now + 2.0);
-  osc2.connect(gain2);
-  gain2.connect(ctx.destination);
-  osc2.start(now);
-  osc2.stop(now + 2.1);
-}
-
-function playGhostDeath() {
-  const ctx = getAudioContext();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  const now = ctx.currentTime;
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(400, now);
-  osc.frequency.exponentialRampToValueAtTime(20, now + 1.5);
-  gain.gain.setValueAtTime(0.4, now);
-  gain.gain.linearRampToValueAtTime(0, now + 1.5);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start(now);
-  osc.stop(now + 1.6);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// §19b  GAME OVER / VICTORY
-// ═══════════════════════════════════════════════════════════════════════════════
 function triggerGameOver() {
   if (gameOver) return;
   gameOver = true;
@@ -1776,17 +1583,6 @@ function triggerGameOver() {
   if (jumpscareEl) jumpscareEl.classList.add("visible");
 }
 
-function triggerVictory() {
-  if (gameOver) return;
-  gameOver = true;
-  if (document.exitPointerLock) document.exitPointerLock();
-  isLocked = false;
-
-  const victoryEl = document.getElementById("victory");
-  const victoryScoreEl = document.getElementById("victoryScore");
-  if (victoryScoreEl) victoryScoreEl.textContent = score;
-  if (victoryEl) victoryEl.classList.add("visible");
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §20  GAME START
