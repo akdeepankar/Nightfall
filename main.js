@@ -1738,6 +1738,13 @@ function showQRCode(url) {
       "width:220px;height:220px;border:2px solid rgba(200,0,10,0.5);border-radius:8px;";
     qrContainerEl.innerHTML = "";
     qrContainerEl.appendChild(img);
+
+    // Also populate startup QR in the overlay
+    const startupQR = document.getElementById("startupQR");
+    if (startupQR) {
+      startupQR.innerHTML = "";
+      startupQR.appendChild(img.cloneNode(true));
+    }
   }
 
   if (qrUrlEl) qrUrlEl.textContent = url;
@@ -1808,9 +1815,23 @@ function connectToServer() {
       setControllerStatus(true);
       showWarning("📱 Controller connected!");
       syncAmmoToController();
+
+      // Toggle startup UI
+      const startupQR = document.getElementById("startupQRContainer");
+      const enterBtn = document.getElementById("enterBtn");
+      if (startupQR) startupQR.style.display = "none";
+      if (enterBtn) enterBtn.style.display = "block";
     }
     if (msg.type === "controllerDisconnected") {
-      setControllerStatus(msg.count > 0);
+      const remaining = msg.count || 0;
+      setControllerStatus(remaining > 0);
+      
+      if (remaining === 0) {
+        const startupQR = document.getElementById("startupQRContainer");
+        const enterBtn = document.getElementById("enterBtn");
+        if (startupQR) startupQR.style.display = "flex";
+        if (enterBtn) enterBtn.style.display = "none";
+      }
     }
 
     // ── Actions forwarded from the iPhone ────────────────────────────────

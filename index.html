@@ -896,7 +896,12 @@
             <p class="subtitle">A horror experience</p>
             <div class="divider"></div>
 
-            <button id="enterBtn" aria-label="Enter the game">
+            <div id="startupQRContainer" style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                <p class="subtitle" style="letter-spacing: 0.2em; font-size: 0.8rem; color: #aaa;">Connect Controller to Start</p>
+                <div id="startupQR"></div>
+            </div>
+
+            <button id="enterBtn" style="display: none;" aria-label="Enter the game">
                 Click to Enter
             </button>
 
