@@ -1308,14 +1308,12 @@ const GHOST_SPEED = 0.022;
 const GHOST_ATTACK_DIST = 1.3;
 const GHOST_WANDER_SPEED = 0.012;
 
-// ── GHOST MODEL LOADER ───────────────────────────────────────────────────
-let ghostAssets = null; // will store { scene, ghostMat, ghostLight }
-const loader = new THREE.GLTFLoader();
-loader.load('3dmodels/ghost_girl.glb', (gltf) => {
-  const model = gltf.scene;
-  model.scale.set(1.2, 1.2, 1.2);
-  
-  // Create a ghost-like material for the model
+let ghost = null; // { mesh, hp, state, wanderAngle, wanderTimer, groanTimer, bobTimer, flashTimer }
+
+function buildGhostMesh() {
+  const g = new THREE.Group();
+
+  // Ghostly translucent material
   const ghostMat = new THREE.MeshStandardMaterial({
     color: 0x99bbcc,
     roughness: 0.3,
@@ -1325,48 +1323,45 @@ loader.load('3dmodels/ghost_girl.glb', (gltf) => {
     transparent: true,
     opacity: 0.55,
   });
-
-  model.traverse((child) => {
-    if (child.isMesh) {
-      child.material = ghostMat;
-      child.castShadow = true;
-      child.receiveShadow = true;
-    }
+  const eyeMat = new THREE.MeshBasicMaterial({
+    color: 0x00ffcc,
+    transparent: true,
+    opacity: 0.9,
   });
 
+  // Hooded head / skull
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), ghostMat);
+  head.position.y = 1.7;
+  head.scale.set(1, 1.15, 1);
+  g.add(head);
+
+  // Eyes — eerie green glow
+  [-0.1, 0.1].forEach((ex) => {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), eyeMat);
+    eye.position.set(ex, 1.72, 0.26);
+    g.add(eye);
+  });
+
+  // Torso — wispy draped shape
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.45, 1.0, 8), ghostMat);
+  torso.position.y = 1.1;
+  g.add(torso);
+
+  // Lower body — fading tail
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.8, 8), ghostMat.clone());
+  tail.material.opacity = 0.3;
+  tail.position.y = 0.3;
+  tail.rotation.x = Math.PI; // point down
+  g.add(tail);
+
+  // Ghost glow light
   const ghostLight = new THREE.PointLight(0x33ffaa, 0, 6);
   ghostLight.position.set(0, 1.4, 0);
-  model.add(ghostLight);
-
-  ghostAssets = { scene: model, ghostMat, ghostLight };
-  console.log("  👻  ghost_girl.glb loaded");
-});
-
-
-let ghost = null; // { mesh, hp, state, wanderAngle, wanderTimer, groanTimer, bobTimer, flashTimer }
-
-function buildGhostMesh() {
-  if (!ghostAssets) {
-    // Fallback if model not loaded yet (should rarely happen)
-    const g = new THREE.Group();
-    g.userData.ghostMat = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0 });
-    g.userData.ghostLight = new THREE.PointLight(0, 0, 0);
-    return g;
-  }
-
-  const g = ghostAssets.scene.clone();
-  // Ensure materials are clones so they don't share state between instances (though there's only one ghost)
-  g.traverse((child) => {
-    if (child.isMesh) child.material = child.material.clone();
-  });
-  
-  const ghostLight = g.children.find(c => c.isPointLight);
-  const ghostMat = g.children.find(c => c.isMesh)?.material || ghostAssets.ghostMat;
+  g.add(ghostLight);
 
   g.userData.ghostMat = ghostMat;
+  g.userData.eyeMat = eyeMat;
   g.userData.ghostLight = ghostLight;
-  // We'll use ghostMat for eye effects since there are no discrete eyes in the GLB
-  g.userData.eyeMat = { opacity: 1 }; // dummy
 
   return g;
 }
@@ -1390,18 +1385,18 @@ function spawnGhost() {
     deathTimer: 0,
   };
 
-  // Sleeping: dimmed and translucent
-  if (mesh.userData.eyeMat) mesh.userData.eyeMat.opacity = 0.2;
-  if (mesh.userData.ghostLight) mesh.userData.ghostLight.intensity = 0;
-  if (mesh.userData.ghostMat) mesh.userData.ghostMat.opacity = 0.15;
+  // Sleeping: eyes dimmed, no glow
+  mesh.userData.eyeMat.opacity = 0.2;
+  mesh.userData.ghostLight.intensity = 0;
+  mesh.userData.ghostMat.opacity = 0.25;
 }
 
 function wakeGhost() {
   if (!ghost || ghost.state !== 'sleeping') return;
   ghost.state = 'hunting';
-  if (ghost.mesh.userData.eyeMat) ghost.mesh.userData.eyeMat.opacity = 0.9;
-  if (ghost.mesh.userData.ghostLight) ghost.mesh.userData.ghostLight.intensity = 2.0;
-  if (ghost.mesh.userData.ghostMat) ghost.mesh.userData.ghostMat.opacity = 0.7;
+  ghost.mesh.userData.eyeMat.opacity = 0.9;
+  ghost.mesh.userData.ghostLight.intensity = 1.5;
+  ghost.mesh.userData.ghostMat.opacity = 0.55;
 
   // Dramatic full-screen wake alert
   const wakeOverlay = document.getElementById('ghostWake');

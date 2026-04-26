@@ -344,10 +344,11 @@
             <div id="controls">
                 <button id="fire" aria-label="Fire">FIRE</button>
                 
-                <!-- Movement Controls -->
-                <div id="move-controls">
-                    <button id="forward" class="btn-move">FORWARD</button>
-                    <button id="backward" class="btn-move">BACKWARD</button>
+                <!-- Joystick Movement -->
+                <div id="joystick-container">
+                    <div id="joystick-base">
+                        <div id="joystick-thumb"></div>
+                    </div>
                 </div>
 
                 <!-- Hidden/Optional Info -->
@@ -455,28 +456,36 @@
                 background: #5a1a1a;
             }
 
-            #move-controls {
+            #joystick-container {
                 display: flex;
-                flex-direction: column;
-                gap: 10px;
+                justify-content: center;
+                align-items: center;
+                height: 180px;
+                margin: 10px 0;
             }
 
-            .btn-move {
-                width: 100%;
-                height: 80px;
-                background: rgba(255, 255, 255, 0.08);
-                border: 1px solid rgba(255, 255, 255, 0.15);
-                border-radius: 16px;
-                color: #fff;
-                font-size: 18px;
-                font-weight: 700;
-                letter-spacing: 0.1em;
-                transition: background 0.1s;
-                -webkit-tap-highlight-color: transparent;
+            #joystick-base {
+                width: 140px;
+                height: 140px;
+                background: rgba(255, 255, 255, 0.03);
+                border: 2px solid rgba(255, 255, 255, 0.1);
+                border-radius: 50%;
+                position: relative;
+                touch-action: none;
             }
-            .btn-move:active {
-                background: rgba(255, 255, 255, 0.2);
-                transform: scale(0.99);
+
+            #joystick-thumb {
+                width: 60px;
+                height: 60px;
+                background: linear-gradient(135deg, #333 0%, #111 100%);
+                border: 2px solid rgba(255, 255, 255, 0.2);
+                border-radius: 50%;
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+                pointer-events: none;
             }
 
             #actions {
@@ -990,22 +999,70 @@
                 fireNow(false);
             });
 
-            const forward = el("forward");
-            const backward = el("backward");
+            const base = el("joystick-base");
+            const thumb = el("joystick-thumb");
+            let stickActive = false;
+            let stickStartPos = { x: 0, y: 0 };
+            let stickDir = { w: false, s: false, a: false, d: false };
 
-            const handleMove = (dir, start) => {
-                send({ type: start ? "move" : "stop", direction: dir });
+            const updateStick = (x, y) => {
+                const rect = base.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                let dx = x - centerX;
+                let dy = y - centerY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const maxLen = rect.width / 2;
+                
+                if (dist > maxLen) {
+                    dx = (dx / dist) * maxLen;
+                    dy = (dy / dist) * maxLen;
+                }
+                
+                thumb.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                
+                // Map to WASD
+                const deadzone = 15;
+                const newDir = {
+                    w: dy < -deadzone,
+                    s: dy > deadzone,
+                    a: dx < -deadzone,
+                    d: dx > deadzone
+                };
+
+                for (const k in newDir) {
+                    if (newDir[k] !== stickDir[k]) {
+                        send({ type: newDir[k] ? "move" : "stop", direction: k });
+                        stickDir[k] = newDir[k];
+                    }
+                }
             };
 
-            forward.addEventListener("touchstart", (e) => { e.preventDefault(); handleMove("w", true); });
-            forward.addEventListener("touchend", (e) => { e.preventDefault(); handleMove("w", false); });
-            forward.addEventListener("mousedown", () => handleMove("w", true));
-            forward.addEventListener("mouseup", () => handleMove("w", false));
+            base.addEventListener("touchstart", (e) => {
+                e.preventDefault();
+                stickActive = true;
+                const t = e.touches[0];
+                updateStick(t.clientX, t.clientY);
+            });
 
-            backward.addEventListener("touchstart", (e) => { e.preventDefault(); handleMove("s", true); });
-            backward.addEventListener("touchend", (e) => { e.preventDefault(); handleMove("s", false); });
-            backward.addEventListener("mousedown", () => handleMove("s", true));
-            backward.addEventListener("mouseup", () => handleMove("s", false));
+            window.addEventListener("touchmove", (e) => {
+                if (!stickActive) return;
+                const t = e.touches[0];
+                updateStick(t.clientX, t.clientY);
+            }, { passive: false });
+
+            window.addEventListener("touchend", () => {
+                if (!stickActive) return;
+                stickActive = false;
+                thumb.style.transform = "translate(-50%, -50%)";
+                for (const k in stickDir) {
+                    if (stickDir[k]) {
+                        send({ type: "stop", direction: k });
+                        stickDir[k] = false;
+                    }
+                }
+            });
 
             renderAmmo(10, 10);
             connect();
