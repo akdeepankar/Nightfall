@@ -1330,14 +1330,6 @@ function updateGhosts(delta) {
       return;
     }
 
-    // --- SLEEPING: check if noise level hits danger ---
-    if (g.state === "sleeping") {
-      if (noiseLevel >= 0.7) {
-        wakeGhosts();
-      }
-      return;
-    }
-
     // --- HUNTING ---
     // Contact → game over
     if (dist < GHOST_ATTACK_DIST) {
@@ -1512,7 +1504,7 @@ function spawnGhosts(count) {
     ghosts.push({
       mesh,
       hp: GHOST_HP,
-      state: "sleeping", // sleeping → hunting → dying → dead
+      state: "hunting", // Start hunting immediately
       wanderAngle: Math.random() * Math.PI * 2,
       wanderTimer: 0,
       groanTimer: 2000 + Math.random() * 3000,
@@ -1521,34 +1513,13 @@ function spawnGhosts(count) {
       deathTimer: 0,
     });
 
-    // Sleeping: eyes dimmed, no glow
-    mesh.userData.eyeMat.opacity = 0.2;
-    mesh.userData.ghostLight.intensity = 0;
-    mesh.userData.ghostMat.opacity = 0.25;
+    // Full hunting visuals immediately
+    mesh.userData.eyeMat.opacity = 0.9;
+    mesh.userData.ghostLight.intensity = 1.5;
+    mesh.userData.ghostMat.opacity = 0.55;
   }
 }
 
-function wakeGhosts() {
-  let anyWoken = false;
-  ghosts.forEach((g) => {
-    if (g.state === "sleeping") {
-      g.state = "hunting";
-      g.mesh.userData.eyeMat.opacity = 0.9;
-      g.mesh.userData.ghostLight.intensity = 1.5;
-      g.mesh.userData.ghostMat.opacity = 0.55;
-      anyWoken = true;
-    }
-  });
-
-  if (anyWoken) {
-    const wakeOverlay = document.getElementById("ghostWake");
-    if (wakeOverlay) {
-      wakeOverlay.classList.add("visible");
-      setTimeout(() => wakeOverlay.classList.remove("visible"), 3500);
-    }
-    playGhostWake();
-  }
-}
 
 function hitGhost(g) {
   if (!g || g.state === "dying" || g.state === "dead") return;
@@ -1612,7 +1583,7 @@ function startGame() {
   if (gameStarted) return;
   gameStarted = true;
   spawnGhosts(currentLevel);
-  showWarning("Be quiet... something is sleeping in the dark.");
+  showWarning("THE HUNTS BEGINS...");
 }
 
 if (enterBtnEl) enterBtnEl.addEventListener("click", startGame);
