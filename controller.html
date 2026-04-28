@@ -350,7 +350,6 @@
             <div id="actions">
                 <button id="reconnect" class="btn-ghost">CONNECT</button>
                 <button id="enable">ENABLE MOTION</button>
-                <button id="start" class="btn-ghost">START</button>
                 <button id="reload" class="btn-warn">RELOAD</button>
             </div>
 
@@ -980,10 +979,6 @@
                 sensorTxt.textContent = "Requesting";
                 sensorSub.textContent = "Requesting...";
                 await enableMotion();
-            };
-            el("start").onclick = () => {
-                send({ type: "start" });
-                showToast("Start Game sent");
             };
             el("reload").onclick = () => {
                 send({ type: "reload" });

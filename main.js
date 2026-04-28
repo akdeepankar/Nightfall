@@ -1658,30 +1658,26 @@ if (document.getElementById("restartBtn")) {
 // ═══════════════════════════════════════════════════════════════════════════════
 function startGame() {
   if (gameOver) return;
-
-  // First call enters empty room only.
-  if (!roomEntered) {
-    roomEntered = true;
-    getAudioContext();
-    startAmbientDrone();
-
-    if (overlayEl) overlayEl.style.display = "none";
-    if (hudEl) hudEl.classList.add("active");
-    if (ammoHudEl) ammoHudEl.classList.add("active");
-    if (crosshairEl) crosshairEl.classList.add("active");
-    if (noiseMeterEl) noiseMeterEl.classList.add("active");
-
-    updateHUD();
-    requestLock();
-    showWarning("Empty room loaded. Press Start Game on controller to begin.");
-    return;
-  }
-
-  // Second call (controller Start command) begins enemies.
   if (gameStarted) return;
+
+  roomEntered = true;
   gameStarted = true;
+  getAudioContext();
+  startAmbientDrone();
+
+  if (overlayEl) overlayEl.style.display = "none";
+  if (hudEl) hudEl.classList.add("active");
+  if (ammoHudEl) ammoHudEl.classList.add("active");
+  if (crosshairEl) crosshairEl.classList.add("active");
+  if (noiseMeterEl) noiseMeterEl.classList.add("active");
+
+  updateHUD();
+  requestLock();
+
+  spawnInitialWave();
   spawnGhosts(currentLevel);
-  showWarning("THE HUNTS BEGINS...");
+
+  showWarning("THE HUNT BEGINS...");
 }
 
 if (enterBtnEl) enterBtnEl.addEventListener("click", startGame);
@@ -1830,8 +1826,7 @@ function connectToServer() {
 
     // ── Actions forwarded from the iPhone ────────────────────────────────
     if (msg.type === "start") {
-      // If room isn't entered yet, first start opens empty room.
-      // If already entered, second start begins enemy gameplay.
+      // (Legacy support) Starts the game if not already started.
       startGame();
     }
     if (msg.type === "fire") fireGun();
