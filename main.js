@@ -1428,7 +1428,7 @@ function nextLevel() {
 
   currentLevel++;
   // Reset player position for fresh start
-  yawObject.position.set(0, 0, 0);
+  yawObject.position.set(5, 1.7, -3);
   pitchObject.rotation.set(0, 0, 0);
   yawObject.rotation.set(0, 0, 0);
 
@@ -1560,6 +1560,8 @@ function hitGhost(g) {
     g.state = "dying";
     g.deathTimer = 1200;
     playGhostDeath();
+    score++;
+    updateHUD();
   }
 }
 
@@ -1602,7 +1604,7 @@ function resetGame() {
   ghosts.length = 0;
 
   // Reset player position
-  yawObject.position.set(0, 0, 0);
+  yawObject.position.set(5, 1.7, -3);
   pitchObject.rotation.set(0, 0, 0);
   yawObject.rotation.set(0, 0, 0);
 
