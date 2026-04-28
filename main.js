@@ -576,6 +576,48 @@ function playZombieGroan() {
   osc.stop(now + 1.0);
 }
 
+// Eerie high-pitched sliding sine groan
+function playGhostGroan(volume = 0.5) {
+  const ctx = getAudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  const now = ctx.currentTime;
+
+  // Slide from mid-high to low-mid
+  osc.frequency.setValueAtTime(500, now);
+  osc.frequency.exponentialRampToValueAtTime(150, now + 1.5);
+
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(volume * 0.15, now + 0.4);
+  gain.gain.linearRampToValueAtTime(0, now + 1.5);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 1.6);
+}
+
+// High-to-low sweeping death wail
+function playGhostDeath() {
+  const ctx = getAudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  const now = ctx.currentTime;
+
+  osc.frequency.setValueAtTime(800, now);
+  osc.frequency.exponentialRampToValueAtTime(40, now + 1.2);
+
+  gain.gain.setValueAtTime(0.25, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 1.3);
+}
+
 // Loud white-noise jumpscare burst
 function playJumpscare() {
   const ctx = getAudioContext(),
