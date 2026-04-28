@@ -1389,11 +1389,11 @@ function updateGhosts(delta) {
     } else if (!collidesWithWalls(gx, gz + nz, 0.35)) {
       g.mesh.position.z += nz;
     } else {
-      // Try to go around
+      // Try to go around — pick a random angle if stuck
       g.wanderTimer -= delta;
       if (g.wanderTimer <= 0) {
-        g.wanderAngle = Math.atan2(ddx, ddz) + (Math.random() - 0.5) * 2;
-        g.wanderTimer = 500;
+        g.wanderAngle = Math.random() * Math.PI * 2;
+        g.wanderTimer = 300 + Math.random() * 400;
       }
       const wx = Math.sin(g.wanderAngle) * spd;
       const wz = Math.cos(g.wanderAngle) * spd;
@@ -1517,10 +1517,28 @@ function buildGhostMesh() {
 function spawnGhosts(count) {
   for (let i = 0; i < count; i++) {
     const mesh = buildGhostMesh();
-    // Spawn far from player, spread out
-    const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.5);
-    const dist = 15 + Math.random() * 5;
-    mesh.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+    
+    // Attempt to spawn in a non-colliding spot
+    let spawned = false;
+    let attempts = 0;
+    while (!spawned && attempts < 30) {
+      const angle = (Math.PI * 2 * i) / count + (Math.random() * 1.5);
+      const dist = 12 + Math.random() * 8;
+      const tx = Math.cos(angle) * dist;
+      const tz = Math.sin(angle) * dist;
+      
+      if (!collidesWithWalls(tx, tz, 0.5)) {
+        mesh.position.set(tx, 0, tz);
+        spawned = true;
+      }
+      attempts++;
+    }
+    
+    // Fallback if all random spots are blocked
+    if (!spawned) {
+      mesh.position.set(5 + Math.random() * 5, 0, 5 + Math.random() * 5);
+    }
+    
     scene.add(mesh);
 
     ghosts.push({
