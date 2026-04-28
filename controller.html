@@ -501,6 +501,7 @@
             }
 
             #actions button {
+                flex: 1;
                 padding: 15px 5px;
                 border-radius: 12px;
                 border: 1px solid rgba(255,255,255,0.1);
@@ -510,6 +511,8 @@
                 font-weight: 700;
                 letter-spacing: 0.05em;
                 text-transform: uppercase;
+                overflow: hidden;
+                white-space: nowrap;
             }
 
             #actions .btn-warn { background: #ffaa00; color: #000; border: none; }
@@ -661,6 +664,26 @@
                         return;
                     }
                     if (m.type === "ammoSync") renderAmmo(m.ammo, m.maxAmmo);
+                    if (m.type === "stateUpdate") {
+                        const fireBtn = el("fire");
+                        if (m.state === "playing") {
+                            fireBtn.textContent = "FIRE";
+                            fireBtn.style.background = ""; // Reset to default CSS
+                            fireBtn.style.borderColor = "";
+                        } else if (m.state === "gameover") {
+                            fireBtn.textContent = "RESTART";
+                            fireBtn.style.background = "linear-gradient(135deg, #ff4444 0%, #880000 100%)";
+                            fireBtn.style.borderColor = "#ff8888";
+                        } else if (m.state === "victory") {
+                            fireBtn.textContent = "NEXT LEVEL";
+                            fireBtn.style.background = "linear-gradient(135deg, #00ff88 0%, #004422 100%)";
+                            fireBtn.style.borderColor = "#88ffcc";
+                        } else if (m.state === "waiting") {
+                            fireBtn.textContent = "ENTER";
+                            fireBtn.style.background = "linear-gradient(135deg, #444 0%, #222 100%)";
+                            fireBtn.style.borderColor = "#666";
+                        }
+                    }
                     if (m.type === "serverInfo")
                         host.textContent =
                             "Game server: http://" + m.ip + ":" + m.port;
@@ -691,15 +714,22 @@
                 cool = true;
                 setTimeout(() => (cool = false), 300);
 
-                send({ type: "fire" });
-                pulseFlash();
+                const btn = el("fire");
+                const label = btn.textContent;
+
+                if (label === "FIRE") {
+                    send({ type: "fire" });
+                    pulseFlash();
+                } else {
+                    send({ type: "start" });
+                }
 
                 fire.style.transform = "scale(0.97)";
                 setTimeout(() => (fire.style.transform = ""), 120);
 
                 if (navigator.vibrate) navigator.vibrate(20);
 
-                if (fromShake) {
+                if (fromShake && label === "FIRE") {
                     fire.textContent = "Fired";
                     setTimeout(() => (fire.textContent = "Fire"), 320);
                 }

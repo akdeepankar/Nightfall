@@ -135,26 +135,25 @@ wss.on("connection", (ws, req) => {
       return;
     }
 
-    // ── Controller → Game actions ──────────────────────────────────────────
-    // Forward controller actions/messages verbatim to the game client.
-    // Supported now: "fire", "reload", "look", "calibrate", "start"
-    if (msg.type === "look") {
-      // High-frequency stream; forward silently to avoid terminal spam.
-      broadcast(gameClient, msg);
-      return;
-    }
-
-    if (
-      msg.type === "fire" ||
-      msg.type === "reload" ||
-      msg.type === "calibrate" ||
-      msg.type === "start" ||
-      msg.type === "move" ||
-      msg.type === "stop"
-    ) {
-      console.log(`  🎮  ${msg.type} from controller`);
-      broadcast(gameClient, msg);
-      return;
+    // ── Message Forwarding ─────────────────────────────────────────────
+    if (ws === gameClient) {
+      // Forward game client messages (ammo updates, state changes) to all controllers
+      controllers.forEach((ctrl) => broadcast(ctrl, msg));
+    } else {
+      // Forward controller messages (actions, movement) to the game client
+      if (msg.type === "look") {
+        broadcast(gameClient, msg);
+      } else if (
+        msg.type === "fire" ||
+        msg.type === "reload" ||
+        msg.type === "calibrate" ||
+        msg.type === "start" ||
+        msg.type === "move" ||
+        msg.type === "stop"
+      ) {
+        if (msg.type !== "look") console.log(`  🎮  ${msg.type} from controller`);
+        broadcast(gameClient, msg);
+      }
     }
   });
 

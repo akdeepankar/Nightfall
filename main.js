@@ -1419,6 +1419,7 @@ function triggerVictory() {
   isLocked = false;
 
   if (victoryEl) victoryEl.classList.add("visible");
+  syncStateToController("victory");
 }
 
 function nextLevel() {
@@ -1439,6 +1440,7 @@ function nextLevel() {
 
   requestLock();
   showWarning(`LEVEL ${currentLevel}: ${currentLevel} GHOSTS ACTIVE`);
+  syncStateToController("playing");
 }
 
 if (document.getElementById("nextLevelBtn")) {
@@ -1578,13 +1580,11 @@ function triggerGameOver() {
     localStorage.setItem("nightfall_best_score", bestScore.toString());
   }
 
-  const el = document.getElementById("scareFinalScore");
-  if (el) el.textContent = score;
-
   const bestEl = document.getElementById("bestScore");
   if (bestEl) bestEl.textContent = bestScore;
 
   if (jumpscareEl) jumpscareEl.classList.add("visible");
+  syncStateToController("gameover");
 }
 
 function resetGame() {
@@ -1622,6 +1622,7 @@ function resetGame() {
 
   showWarning("GAME RESTARTED");
   requestLock();
+  syncStateToController("playing");
 }
 
 if (document.getElementById("restartBtn")) {
@@ -1653,6 +1654,7 @@ function startGame() {
   spawnGhosts(currentLevel);
 
   showWarning("THE HUNT BEGINS...");
+  syncStateToController("playing");
 }
 
 if (enterBtnEl) enterBtnEl.addEventListener("click", startGame);
@@ -1733,6 +1735,12 @@ function syncAmmoToController() {
   }
 }
 
+function syncStateToController(state) {
+  if (controllerWS && controllerWS.readyState === WebSocket.OPEN) {
+    controllerWS.send(JSON.stringify({ type: "stateUpdate", state }));
+  }
+}
+
 function connectToServer() {
   // Only attempt when the page is served via HTTP (not file://)
   if (window.location.protocol === "file:") return;
@@ -1801,8 +1809,13 @@ function connectToServer() {
 
     // ── Actions forwarded from the iPhone ────────────────────────────────
     if (msg.type === "start") {
-      // (Legacy support) Starts the game if not already started.
-      startGame();
+      if (gameOver) {
+        resetGame();
+      } else if (victory) {
+        nextLevel();
+      } else if (!gameStarted) {
+        startGame();
+      }
     }
     if (msg.type === "fire") fireGun();
     if (msg.type === "reload") startReload();
