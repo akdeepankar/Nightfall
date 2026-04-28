@@ -16,6 +16,7 @@ let roomEntered = false; // true after first Enter/click to load empty room
 let audioCtx = null;
 let ambientStarted = false;
 let score = 0; // zombies killed
+let bestScore = parseInt(localStorage.getItem("nightfall_best_score") || "0");
 let ammo = 10;
 const MAX_AMMO = 10;
 let isReloading = false;
@@ -1456,8 +1457,8 @@ function nextLevel() {
 
   // Reset zombies too
   zombies.forEach((z) => scene.remove(z.mesh));
-  zombies = [];
-  spawnZombies();
+  zombies.length = 0;
+  spawnInitialWave();
 
   requestLock();
   showWarning(`LEVEL ${currentLevel}: ${currentLevel} GHOSTS ACTIVE`);
@@ -1591,9 +1592,64 @@ function triggerGameOver() {
   playJumpscare();
   if (document.exitPointerLock) document.exitPointerLock();
   isLocked = false;
+
+  // Update high score
+  if (score > bestScore) {
+    bestScore = score;
+    localStorage.setItem("nightfall_best_score", bestScore.toString());
+  }
+
   const el = document.getElementById("scareFinalScore");
   if (el) el.textContent = score;
+
+  const bestEl = document.getElementById("bestScore");
+  if (bestEl) bestEl.textContent = bestScore;
+
   if (jumpscareEl) jumpscareEl.classList.add("visible");
+}
+
+function resetGame() {
+  // Reset game state
+  gameOver = false;
+  victory = false;
+  score = 0;
+  ammo = MAX_AMMO;
+  currentLevel = 1;
+  isReloading = false;
+  canFire = true;
+  noiseLevel = 0;
+  displayedNoiseLevel = 0;
+
+  // Clear scene
+  zombies.forEach((z) => scene.remove(z.mesh));
+  zombies.length = 0;
+  ghosts.forEach((g) => scene.remove(g.mesh));
+  ghosts.length = 0;
+
+  // Reset player position
+  yawObject.position.set(0, 0, 0);
+  pitchObject.rotation.set(0, 0, 0);
+  yawObject.rotation.set(0, 0, 0);
+
+  // Update HUD
+  updateHUD();
+  syncAmmoToController();
+
+  // Hide overlays
+  if (jumpscareEl) jumpscareEl.classList.remove("visible");
+  if (victoryEl) victoryEl.classList.remove("visible");
+  if (warningEl) warningEl.classList.remove("active");
+
+  // Spawn initial enemies
+  spawnInitialWave();
+  spawnGhosts(currentLevel);
+
+  showWarning("GAME RESTARTED");
+  requestLock();
+}
+
+if (document.getElementById("restartBtn")) {
+  document.getElementById("restartBtn").addEventListener("click", resetGame);
 }
 
 

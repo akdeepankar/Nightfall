@@ -220,9 +220,10 @@
                 box-shadow: inset 0 0 120px rgba(180, 0, 0, 0.9);
             }
 
-            /* When visible, use flex */
+            /* When visible, use flex and enable pointer events */
             #jumpscare.visible {
                 display: flex;
+                pointer-events: all;
             }
 
             #jumpscare .scare-title {
@@ -975,9 +976,15 @@
             <div class="crack"></div>
             <p class="scare-title">YOU WERE CAUGHT</p>
             <p class="scare-sub">The ghost got you</p>
-            <p class="scare-score">
-                Zombies killed: <span id="scareFinalScore">0</span>
-            </p>
+            <div style="display: flex; flex-direction: column; gap: 8px; align-items: center; margin: 10px 0;">
+                <p class="scare-score">
+                    Zombies killed: <span id="scareFinalScore">0</span>
+                </p>
+                <p class="scare-score" style="color: #00ffaa; opacity: 1;">
+                    Best Score: <span id="bestScore">0</span>
+                </p>
+            </div>
+            <button id="restartBtn" class="victory-btn" style="background: linear-gradient(180deg, #ff4444, #880000); color: #fff; box-shadow: 0 0 20px rgba(255, 0, 0, 0.4); margin-top: 20px;">Restart Game</button>
             <div class="crack"></div>
         </div>
 
