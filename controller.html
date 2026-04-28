@@ -355,7 +355,7 @@
 
             <!-- Main Control Area -->
             <div id="controls">
-                <button id="fire" aria-label="Fire">FIRE</button>
+                <button id="fire" aria-label="Action">ENTER</button>
                 
                 <!-- Joystick Movement -->
                 <div id="joystick-container">
@@ -496,8 +496,11 @@
 
             #actions {
                 display: grid;
-                grid-template-columns: repeat(4, 1fr);
+                grid-template-columns: repeat(3, 1fr);
                 gap: 8px;
+                width: 100%;
+                max-width: 500px;
+                margin: 0 auto;
             }
 
             #actions button {

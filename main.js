@@ -1757,6 +1757,11 @@ function connectToServer() {
   controllerWS.onopen = () => {
     // Identify ourselves as the game client
     controllerWS.send(JSON.stringify({ type: "register", role: "game" }));
+    
+    // Sync initial status immediately
+    setControllerStatus(true);
+    syncAmmoToController();
+    syncStateToController(gameStarted ? "playing" : "waiting");
   };
 
   controllerWS.onmessage = (e) => {
