@@ -897,16 +897,7 @@ function fireGun() {
   // Raycast from exact centre of screen (crosshair)
   raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
 
-  // Collect every mesh from living zombies, map back to their zombie object
-  const targets = [];
-  zombies.forEach((zomb) => {
-    if (zomb.dying) return;
-    zomb.mesh.traverse((child) => {
-      if (child.isMesh) targets.push({ mesh: child, zombie: zomb });
-    });
-  });
-
-  // Also collect ghost meshes for shooting
+  // Collect every mesh from living ghosts
   const ghostTargets = [];
   ghosts.forEach((g) => {
     if (g.state === "hunting") {
@@ -916,21 +907,12 @@ function fireGun() {
     }
   });
 
-  const allShootable = [
-    ...targets.map((t) => t.mesh),
-    ...ghostTargets.map((gt) => gt.mesh),
-  ];
+  const allShootable = ghostTargets.map((gt) => gt.mesh);
   const hits = raycaster.intersectObjects(allShootable);
   if (hits.length > 0) {
     const hitObj = hits[0].object;
-    // Check zombies first
-    const entry = targets.find((t) => t.mesh === hitObj);
-    if (entry) {
-      hitZombie(entry.zombie);
-    } else {
-      const gEntry = ghostTargets.find((gt) => gt.mesh === hitObj);
-      if (gEntry) hitGhost(gEntry.ghost);
-    }
+    const gEntry = ghostTargets.find((gt) => gt.mesh === hitObj);
+    if (gEntry) hitGhost(gEntry.ghost);
   }
 
   // Gunshot also spikes noise
@@ -1283,10 +1265,10 @@ function updateZombies(delta) {
 // ═══════════════════════════════════════════════════════════════════════════════
 function applyCameraShake() {
   let minDist = Infinity;
-  for (const zomb of zombies) {
-    if (zomb.dying) continue;
-    const dx = yawObject.position.x - zomb.mesh.position.x;
-    const dz = yawObject.position.z - zomb.mesh.position.z;
+  for (const g of ghosts) {
+    if (g.state !== "hunting") continue;
+    const dx = yawObject.position.x - g.mesh.position.x;
+    const dz = yawObject.position.z - g.mesh.position.z;
     minDist = Math.min(minDist, Math.sqrt(dx * dx + dz * dz));
   }
   if (minDist > 8) return;
@@ -1455,11 +1437,6 @@ function nextLevel() {
   ghosts = [];
   spawnGhosts(currentLevel);
 
-  // Reset zombies too
-  zombies.forEach((z) => scene.remove(z.mesh));
-  zombies.length = 0;
-  spawnInitialWave();
-
   requestLock();
   showWarning(`LEVEL ${currentLevel}: ${currentLevel} GHOSTS ACTIVE`);
 }
@@ -1620,9 +1597,7 @@ function resetGame() {
   noiseLevel = 0;
   displayedNoiseLevel = 0;
 
-  // Clear scene
-  zombies.forEach((z) => scene.remove(z.mesh));
-  zombies.length = 0;
+  // Clear ghosts
   ghosts.forEach((g) => scene.remove(g.mesh));
   ghosts.length = 0;
 
@@ -1641,7 +1616,6 @@ function resetGame() {
   if (warningEl) warningEl.classList.remove("active");
 
   // Spawn initial enemies
-  spawnInitialWave();
   spawnGhosts(currentLevel);
 
   showWarning("GAME RESTARTED");
@@ -1674,7 +1648,6 @@ function startGame() {
   updateHUD();
   requestLock();
 
-  spawnInitialWave();
   spawnGhosts(currentLevel);
 
   showWarning("THE HUNT BEGINS...");
@@ -1945,7 +1918,6 @@ function animate() {
         isMoving = false;
       }
 
-      updateZombies(delta);
       updateGhosts(delta);
       applyCameraShake();
       flickerLightsUpdate(delta);
