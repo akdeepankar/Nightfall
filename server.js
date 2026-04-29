@@ -61,6 +61,7 @@ const MIME = {
   ".css": "text/css; charset=utf-8",
   ".png": "image/png",
   ".ico": "image/x-icon",
+  ".glb": "model/gltf-binary",
 };
 
 // ── HTTP server — serves all game files statically ───────────────────────────

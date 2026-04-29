@@ -23,6 +23,48 @@ let isReloading = false;
 let canFire = true;
 let victory = false;
 
+// --- 3D Model Loading ---
+let ghostModel = null;
+const gltfLoader = new THREE.GLTFLoader();
+let isModelLoaded = false;
+let startRequested = false;
+
+gltfLoader.load("3dmodels/ghost.glb", (gltf) => {
+  const model = gltf.scene;
+  
+  // Normalize scale and position
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const scale = 2.0 / size.y; // Standardized height
+  model.scale.set(scale, scale, scale);
+  
+  // Align bottom to y=0
+  model.position.y = -box.min.y * scale;
+  
+  ghostModel = new THREE.Group();
+  ghostModel.add(model);
+
+  ghostModel.traverse((node) => {
+    if (node.isMesh) {
+      node.castShadow = true;
+      node.receiveShadow = true;
+      if (node.material) {
+        node.material.transparent = true;
+      }
+    }
+  });
+  
+  isModelLoaded = true;
+  console.log("Ghost model loaded successfully from 3dmodels/ghost.glb");
+  
+  // If user already clicked "Enter", start now
+  if (startRequested) {
+    startGame();
+  }
+}, undefined, (error) => {
+  console.error("Error loading ghost.glb:", error);
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // §2  RENDERER & SCENE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1459,58 +1501,46 @@ let currentLevel = 1;
 let ghosts = []; // Array of ghost objects
 
 function buildGhostMesh() {
+  if (ghostModel) {
+    const g = ghostModel.clone();
+
+    // Ghost light for proximity effect
+    const ghostLight = new THREE.PointLight(0x33ffaa, 0, 6);
+    ghostLight.position.set(0, 1.4, 0);
+    g.add(ghostLight);
+
+    // Find materials for the updateGhosts loop to control
+    let mainMat = null;
+    g.traverse((node) => {
+      if (node.isMesh && !mainMat) {
+        mainMat = node.material;
+      }
+    });
+
+    // Mock eyeMat if the model doesn't have separate eyes we can easily target
+    const eyeMat = { opacity: 0.9 };
+
+    g.userData.ghostMat = mainMat || new THREE.MeshStandardMaterial({ transparent: true, opacity: 0.8 });
+    g.userData.eyeMat = eyeMat;
+    g.userData.ghostLight = ghostLight;
+
+    return g;
+  }
+
+  // FALLBACK: Simple cube if GLB isn't loaded yet (so user knows it's working)
+  console.warn("Ghost model not loaded yet, using placeholder");
   const g = new THREE.Group();
-
-  // Ghostly translucent material
-  const ghostMat = new THREE.MeshStandardMaterial({
-    color: 0x99bbcc,
-    roughness: 0.3,
-    metalness: 0.1,
-    emissive: 0x334455,
-    emissiveIntensity: 0.6,
-    transparent: true,
-    opacity: 0.55,
-  });
-  const eyeMat = new THREE.MeshBasicMaterial({
-    color: 0x00ffcc,
-    transparent: true,
-    opacity: 0.9,
-  });
-
-  // Hooded head / skull
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), ghostMat);
-  head.position.y = 1.7;
-  head.scale.set(1, 1.15, 1);
-  g.add(head);
-
-  // Eyes — eerie green glow
-  [-0.1, 0.1].forEach((ex) => {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), eyeMat);
-    eye.position.set(ex, 1.72, 0.26);
-    g.add(eye);
-  });
-
-  // Torso — wispy draped shape
-  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.45, 1.0, 8), ghostMat);
-  torso.position.y = 1.1;
-  g.add(torso);
-
-  // Lower body — fading tail
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.8, 8), ghostMat.clone());
-  tail.material.opacity = 0.3;
-  tail.position.y = 0.3;
-  tail.rotation.x = Math.PI; // point down
-  g.add(tail);
-
-  // Ghost glow light
-  const ghostLight = new THREE.PointLight(0x33ffaa, 0, 6);
-  ghostLight.position.set(0, 1.4, 0);
-  g.add(ghostLight);
-
-  g.userData.ghostMat = ghostMat;
-  g.userData.eyeMat = eyeMat;
-  g.userData.ghostLight = ghostLight;
-
+  const placeholder = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 1.8, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0xff0000, wireframe: true })
+  );
+  placeholder.position.y = 0.9;
+  g.add(placeholder);
+  
+  g.userData.ghostMat = placeholder.material;
+  g.userData.eyeMat = { opacity: 1 };
+  g.userData.ghostLight = new THREE.PointLight(0xff0000, 0, 4);
+  
   return g;
 }
 
@@ -1654,6 +1684,16 @@ if (document.getElementById("restartBtn")) {
 function startGame() {
   if (gameOver) return;
   if (gameStarted) return;
+
+  if (!isModelLoaded) {
+    startRequested = true;
+    if (enterBtnEl) {
+      enterBtnEl.textContent = "LOADING MODEL...";
+      enterBtnEl.style.opacity = "0.6";
+      enterBtnEl.style.pointerEvents = "none";
+    }
+    return;
+  }
 
   roomEntered = true;
   gameStarted = true;
