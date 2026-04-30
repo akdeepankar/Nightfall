@@ -25,8 +25,10 @@ let victory = false;
 
 // --- 3D Model Loading ---
 let ghostModel = null;
+let cityModel = null;
 const gltfLoader = new THREE.GLTFLoader();
-let isModelLoaded = false;
+let isGhostLoaded = false;
+let isCityLoaded = false;
 let startRequested = false;
 
 gltfLoader.load("3dmodels/ghost.glb", (gltf) => {
@@ -54,16 +56,62 @@ gltfLoader.load("3dmodels/ghost.glb", (gltf) => {
     }
   });
   
-  isModelLoaded = true;
-  console.log("Ghost model loaded successfully from 3dmodels/ghost.glb");
-  
-  // If user already clicked "Enter", start now
-  if (startRequested) {
-    startGame();
-  }
+  isGhostLoaded = true;
+  console.log("Ghost model loaded successfully");
+  checkAllModelsLoaded();
 }, undefined, (error) => {
   console.error("Error loading ghost.glb:", error);
 });
+
+gltfLoader.load("3dmodels/city.glb", (gltf) => {
+  cityModel = gltf.scene;
+  
+  // Optimize the city model
+  cityModel.traverse((node) => {
+    if (node.isMesh) {
+      node.receiveShadow = true;
+      node.castShadow = true;
+      
+      // If the material is too bright for a horror game, tone it down
+      if (node.material) {
+        node.material.roughness = 0.8;
+        if (node.material.emissive) {
+          node.material.emissiveIntensity = 0.2;
+        }
+      }
+    }
+  });
+
+  // Normalize scale for a large environment
+  const box = new THREE.Box3().setFromObject(cityModel);
+  const size = box.getSize(new THREE.Vector3());
+  const targetWidth = 150; 
+  const scale = targetWidth / Math.max(size.x, size.z);
+  cityModel.scale.set(scale, scale, scale);
+  
+  // Center it and sit on floor
+  const center = box.getCenter(new THREE.Vector3());
+  cityModel.position.x = -center.x * scale;
+  cityModel.position.z = -center.z * scale;
+  cityModel.position.y = -box.min.y * scale;
+
+  scene.add(cityModel);
+  
+  isCityLoaded = true;
+  console.log("City model loaded successfully, scale:", scale);
+  checkAllModelsLoaded();
+}, undefined, (error) => {
+  console.error("Error loading city.glb:", error);
+});
+
+function checkAllModelsLoaded() {
+  if (isGhostLoaded && isCityLoaded) {
+    // If user already clicked "Enter", start now
+    if (startRequested) {
+      startGame();
+    }
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §2  RENDERER & SCENE
@@ -255,7 +303,7 @@ const pitchObject = new THREE.Object3D();
 pitchObject.add(camera);
 
 const yawObject = new THREE.Object3D();
-yawObject.position.set(5, 1.7, -3); // spawn in open north-east corridor
+yawObject.position.set(0, 1.7, 0); // spawn at center of city
 yawObject.add(pitchObject);
 scene.add(yawObject);
 
@@ -429,28 +477,16 @@ function addWall(cx, cz, w, d, h = 4) {
   });
 }
 
-// Floor & ceiling
-makeBox(40, 0.3, 40, floorMat, 0, -0.15, 0);
-makeBox(40, 0.3, 40, ceilMat, 0, 4.15, 0);
+// Environment meshes
+const floorGeom = new THREE.PlaneGeometry(300, 300);
+const floorMesh = new THREE.Mesh(floorGeom, floorMat);
+floorMesh.rotation.x = -Math.PI / 2;
+floorMesh.receiveShadow = true;
+scene.add(floorMesh);
 
-// Outer perimeter (40×40)
-addWall(0, -20, 40, 1); // North
-addWall(0, 20, 40, 1); // South
-addWall(-20, 0, 1, 40); // West
-addWall(20, 0, 1, 40); // East
-
-// Inner maze walls (spawn is at x=5, z=-3 — all these are clear of that area)
-addWall(0, 10, 1, 16); // south centre spine  (z = 2→18)
-addWall(0, -9, 1, 10); // north centre spine  (z = -14→-4)
-addWall(-10, -8, 10, 1); // NW horizontal bar
-addWall(-5, -4, 1, 8); // NW vertical stub
-addWall(14, -8, 1, 12); // NE pocket east wall
-addWall(9, -13, 10, 1); // NE pocket top
-addWall(-8, 8, 1, 12); // SW long divider
-addWall(-13, 3, 10, 1); // SW cross-piece
-addWall(5, 8, 10, 1); // SE passage blocker
-addWall(13, 13, 1, 10); // SE east pocket
-addWall(-3, -6, 6, 1); // west alcove stub
+// Add a slight ambient light for city visibility
+const cityAmbient = new THREE.AmbientLight(0x111122, 0.5);
+scene.add(cityAmbient);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §7  COLLISION HELPER
@@ -1471,7 +1507,7 @@ function nextLevel() {
 
   currentLevel++;
   // Reset player position for fresh start
-  yawObject.position.set(5, 1.7, -3);
+  yawObject.position.set(0, 1.7, 0);
   pitchObject.rotation.set(0, 0, 0);
   yawObject.rotation.set(0, 0, 0);
 
@@ -1652,7 +1688,7 @@ function resetGame() {
   ghosts.length = 0;
 
   // Reset player position
-  yawObject.position.set(5, 1.7, -3);
+  yawObject.position.set(0, 1.7, 0);
   pitchObject.rotation.set(0, 0, 0);
   yawObject.rotation.set(0, 0, 0);
 
@@ -1685,7 +1721,7 @@ function startGame() {
   if (gameOver) return;
   if (gameStarted) return;
 
-  if (!isModelLoaded) {
+  if (!isGhostLoaded || !isCityLoaded) {
     startRequested = true;
     if (enterBtnEl) {
       enterBtnEl.textContent = "LOADING MODEL...";
